@@ -181,7 +181,7 @@ func (h *Handle) circulation() (err error) {
 	for _, v := range h.updateValue["state"].([]map[string]interface{}) {
 		stateList = append(stateList, v)
 	}
-	err = GetVariableValue(stateList, h.workOrderDetails.Creator)
+	err = GetVariableValueForCirculation(stateList, h)
 	if err != nil {
 		return
 	}
@@ -444,6 +444,8 @@ func (h *Handle) HandleWorkOrder(
 				err = errors.New(e)
 			case error:
 				err = e
+				e.Error()
+				println(e)
 			default:
 				err = errors.New("未知错误")
 			}
@@ -477,6 +479,10 @@ func (h *Handle) HandleWorkOrder(
 	h.stateValue, err = h.processState.GetNode(sourceState)
 	if err != nil {
 		return
+	}
+	if h.stateValue["assignType"] == "template" {
+		assignValueList := make([]interface{}, 0)
+		h.stateValue["assignValue"] = append(assignValueList, h.stateValue["assignValue"].(interface{}))
 	}
 
 	// 目标状态
@@ -677,15 +683,25 @@ func (h *Handle) HandleWorkOrder(
 		}
 	case "userTask":
 		stateValue["processor"] = h.targetStateValue["assignValue"].([]interface{})
-		stateValue["process_method"] = h.targetStateValue["assignType"].(string)
+		if stateValue["process_method"] == "template" {
+			processorList := make([]interface{}, 0)
+			stateValue["processor"] = append(processorList, h.targetStateValue["assignValue"].(interface{}))
+		} else {
+			stateValue["processor"] = h.targetStateValue["assignValue"].([]interface{})
+		}
 		h.updateValue["state"] = []map[string]interface{}{stateValue}
 		err = h.commonProcessing(c)
 		if err != nil {
 			return
 		}
 	case "receiveTask":
-		stateValue["processor"] = h.targetStateValue["assignValue"].([]interface{})
 		stateValue["process_method"] = h.targetStateValue["assignType"].(string)
+		if stateValue["process_method"] == "template" {
+			processorList := make([]interface{}, 0)
+			stateValue["processor"] = append(processorList, h.targetStateValue["assignValue"].(interface{}))
+		} else {
+			stateValue["processor"] = h.targetStateValue["assignValue"].([]interface{})
+		}
 		h.updateValue["state"] = []map[string]interface{}{stateValue}
 		err = h.commonProcessing(c)
 		if err != nil {

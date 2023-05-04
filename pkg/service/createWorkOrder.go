@@ -65,7 +65,7 @@ func CreateWorkOrder(c *gin.Context) (err error) {
 	if err != nil {
 		return
 	}
-	err = GetVariableValue(variableValue, tools.GetUserId(c))
+	err = GetVariableValueWithWorkOrderId(variableValue, tools.GetUserId(c), workOrderValue.Id)
 	if err != nil {
 		err = fmt.Errorf("获取处理人变量值失败，%v", err.Error())
 		return
@@ -193,7 +193,7 @@ func CreateWorkOrder(c *gin.Context) (err error) {
 	}
 
 	// 获取变量数据
-	err = GetVariableValue(variableValue, tools.GetUserId(c))
+	err = GetVariableValueWithWorkOrderId(variableValue, tools.GetUserId(c), workOrderValue.Id)
 	if err != nil {
 		return
 	}
@@ -237,7 +237,6 @@ func CreateWorkOrder(c *gin.Context) (err error) {
 			err = fmt.Errorf("生成json字符串错误，%v", err.Error())
 			return
 		}
-
 		formData := process.TplData{
 			WorkOrder:     workOrderInfo.Id,
 			FormStructure: formStructureJson,
