@@ -682,7 +682,7 @@ func (h *Handle) HandleWorkOrder(
 			return
 		}
 	case "userTask":
-		stateValue["processor"] = h.targetStateValue["assignValue"].([]interface{})
+		stateValue["process_method"] = h.targetStateValue["assignType"].(string)
 		if stateValue["process_method"] == "template" {
 			processorList := make([]interface{}, 0)
 			stateValue["processor"] = append(processorList, h.targetStateValue["assignValue"].(interface{}))

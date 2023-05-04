@@ -12,7 +12,7 @@ settings:
     writertimeout: 2
   database:
     dbtype: mysql
-    host: ferry_mysql
+    host: localhost
     name: ferry
     password: 123456
     port: 3306

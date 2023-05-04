@@ -6,7 +6,6 @@ import (
 	"ferry/models/process"
 	"ferry/models/system"
 	"ferry/pkg/logger"
-	"strconv"
 )
 
 /*
@@ -47,20 +46,26 @@ func GetVariableValueWithWorkOrderId(stateList []interface{}, creator int, workO
 		// lhz todo
 		if stateItem.(map[string]interface{})["process_method"] == "template" {
 			fieldId := stateItem.(map[string]interface{})["processor"].(string)
-			var tplData process.TplData
-			err := orm.Eloquent.Model(&process.TplData{}).Where(" work_order = ? ", workOrderId).Find(&tplData).Error
+			var tplDataList []process.TplData
+			err := orm.Eloquent.Model(&process.TplData{}).Where(" work_order = ? ", workOrderId).Find(&tplDataList).Error
 			if err != nil {
 				logger.Error("tplData not found")
 			}
 			tplDataMap := make(map[string]interface{})
-			err = json.Unmarshal(tplData.FormData, &tplDataMap)
-			if err != nil {
-				logger.Error("failed to unmarshal tplData")
+			for _, tplData := range tplDataList {
+				tmp := make(map[string]interface{})
+				err = json.Unmarshal(tplData.FormData, &tmp)
+				if err != nil {
+					logger.Error("failed to unmarshal tplData")
+				}
+				for key, value := range tmp {
+					tplDataMap[key] = value
+				}
 			}
-			fieldValue := tplDataMap[fieldId].([]interface{})[0].(float64)
-			logger.Info("fieldValue" + strconv.FormatFloat(fieldValue, 'f', 0, 64))
+			//fieldValue := tplDataMap[fieldId].([]interface{})[0].(float64)
+			//logger.Info("fieldValue" + strconv.FormatFloat(fieldValue, 'f', 0, 64))
 			nextProcessor := make([]interface{}, 0)
-			nextProcessor = append(nextProcessor, fieldValue)
+			nextProcessor = append(nextProcessor, tplDataMap[fieldId])
 			stateItem.(map[string]interface{})["processor"] = nextProcessor
 			stateItem.(map[string]interface{})["process_method"] = "person"
 
@@ -105,21 +110,27 @@ func GetVariableValueForCirculation(stateList []interface{}, h *Handle) (err err
 		// lhz
 		if stateItem.(map[string]interface{})["process_method"] == "template" {
 			fieldId := stateItem.(map[string]interface{})["processor"].([]interface{})[0].(string)
-			var tplData process.TplData
-			err := orm.Eloquent.Model(&process.TplData{}).Where(" work_order = ? ", h.workOrderId).Find(&tplData).Error
+			var tplDataList []process.TplData
+			err := orm.Eloquent.Model(&process.TplData{}).Where(" work_order = ? ", h.workOrderId).Find(&tplDataList).Error
 			if err != nil {
 				logger.Error("tplData not found")
 			}
 			tplDataMap := make(map[string]interface{})
-			err = json.Unmarshal(tplData.FormData, &tplDataMap)
-			if err != nil {
-				logger.Error("failed to unmarshal tplData")
+			for _, tplData := range tplDataList {
+				tmp := make(map[string]interface{})
+				err = json.Unmarshal(tplData.FormData, &tmp)
+				if err != nil {
+					logger.Error("failed to unmarshal tplData")
+				}
+				for key, value := range tmp {
+					tplDataMap[key] = value
+				}
 			}
 
-			fieldValue := tplDataMap[fieldId].(float64)
-			logger.Info("fieldValue" + strconv.FormatFloat(fieldValue, 'f', 0, 64))
+			//fieldValue := tplDataMap[fieldId].(float64)
+			//logger.Info("fieldValue" + strconv.FormatFloat(fieldValue, 'f', 0, 64))
 			nextProcessor := make([]interface{}, 0)
-			nextProcessor = append(nextProcessor, fieldValue)
+			nextProcessor = append(nextProcessor, tplDataMap[fieldId])
 			stateItem.(map[string]interface{})["processor"] = nextProcessor
 			stateItem.(map[string]interface{})["process_method"] = "person"
 
