@@ -573,3 +573,52 @@ func ReopenWorkOrder(c *gin.Context) {
 
 	app.OK(c, nil, "")
 }
+
+func SuspendWorkOrder(c *gin.Context) {
+	var (
+		err           error
+		userAuthority bool
+		handle        service.Handle
+		params        struct {
+			WorkOrderId int    `json:"work_order_id"` // 工单ID
+			IsSuspend   bool   `json:"is_suspend"`    // 是否执行任务
+			SourceState string `json:"source_state"`  // 源状态
+		}
+	)
+
+	err = c.ShouldBind(&params)
+	if err != nil {
+		app.Error(c, -1, err, "")
+		return
+	}
+
+	//// 处理工单
+	userAuthority, err = service.JudgeUserAuthority(c, params.WorkOrderId, params.SourceState)
+	if err != nil {
+		app.Error(c, -1, err, fmt.Sprintf("判断用户是否有权限失败，%v", err.Error()))
+		return
+	}
+	if !userAuthority {
+		app.Error(c, -1, errors.New("当前用户没有权限进行此操作"), "")
+		//return
+	}
+
+	err = handle.SuspendWorkOrder(
+		c,
+		params.WorkOrderId, // 工单ID
+		params.IsSuspend,
+		params.SourceState,
+	)
+	if err != nil {
+		app.Error(c, -1, err, fmt.Sprintf("处理工单失败，%v", err.Error()))
+		return
+	}
+
+	msg := "工单恢复完成"
+
+	if params.IsSuspend {
+		msg = "工单挂起完成"
+	}
+
+	app.OK(c, nil, msg)
+}

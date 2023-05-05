@@ -7,6 +7,7 @@ import (
 	"ferry/models/base"
 	"ferry/models/process"
 	"ferry/models/system"
+	"ferry/pkg/jsonTime"
 	"ferry/pkg/notify"
 	"ferry/tools"
 	"fmt"
@@ -812,6 +813,34 @@ func (h *Handle) HandleWorkOrder(
 		CostDuration: costDurationValue,
 		Remarks:      remarks,
 	}
+
+	var woStateList []map[string]interface{}
+	err = json.Unmarshal(h.workOrderDetails.State, &woStateList)
+	for _, woState := range woStateList {
+		if woState["id"] == sourceState {
+			suspendTime, supOk := woState["suspend_time"]
+			resumeTime, resOk := woState["resume_time"]
+			if supOk && resOk {
+				parsedResumeTime, err := time.Parse("2006-01-02 15:04:05", resumeTime.(string))
+				if err != nil {
+
+				}
+				jsonResumeTime := jsonTime.JSONTime{
+					parsedResumeTime,
+				}
+				cirHistoryData.ResumeTime = jsonResumeTime
+				parsedSuspendTime, err := time.Parse("2006-01-02 15:04:05", suspendTime.(string))
+				if err != nil {
+
+				}
+				jsonSuspendTime := jsonTime.JSONTime{
+					parsedSuspendTime,
+				}
+				cirHistoryData.SuspendTime = jsonSuspendTime
+			}
+		}
+	}
+
 	err = h.tx.Create(&cirHistoryData).Error
 	if err != nil {
 		h.tx.Rollback()
@@ -951,5 +980,62 @@ func (h *Handle) HandleWorkOrder(
 		}
 		go ExecTask(execTasks, string(params))
 	}
+	return
+}
+
+func (h *Handle) SuspendWorkOrder(
+	c *gin.Context,
+	workOrderId int,
+	isSuspend bool,
+	currentState string,
+) (err error) {
+	h.workOrderId = workOrderId
+
+	defer func() {
+		if r := recover(); r != nil {
+			switch e := r.(type) {
+			case string:
+				err = errors.New(e)
+			case error:
+				err = e
+				e.Error()
+				println(e)
+			default:
+				err = errors.New("未知错误")
+			}
+			return
+		}
+	}()
+
+	// 获取工单信息
+	err = orm.Eloquent.Model(&process.WorkOrderInfo{}).Where("id = ?", workOrderId).Find(&h.workOrderDetails).Error
+	if err != nil {
+		return
+	}
+
+	var stateValue []map[string]interface{}
+	err = json.Unmarshal(h.workOrderDetails.State, &stateValue)
+	var targetState map[string]interface{}
+	for _, state := range stateValue {
+		if state["id"] == currentState {
+			targetState = state
+		}
+	}
+	if isSuspend {
+		targetState["is_suspend"] = true
+		targetState["suspend_time"] = time.Now().Format("2006-01-02 15:04:05")
+		delete(targetState, "resume_time")
+	} else {
+		targetState["is_suspend"] = false
+		targetState["resume_time"] = time.Now().Format("2006-01-02 15:04:05")
+	}
+
+	stateMarshalVal, err := json.Marshal(stateValue)
+	// 开启事务
+	h.tx = orm.Eloquent.Begin()
+
+	err = orm.Eloquent.Model(&process.WorkOrderInfo{}).Where("id = ?", workOrderId).Update("state", stateMarshalVal).Error
+
+	h.tx.Commit() // 提交事务
 	return
 }
