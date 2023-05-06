@@ -659,9 +659,9 @@ func CirculationList(c *gin.Context) {
 }
 
 func GenerateCirculationExcel(c *gin.Context, circulationList []service.CirculationInfo) {
-	sheetName := "Sheet1"
+	sheetName := "时间明细"
 	f := excelize.NewFile()
-	f.Path = "abc.xlsx"
+	f.Path = "工单时间明细.xlsx"
 	defer func() {
 		if err := f.Close(); err != nil {
 			fmt.Println(err)
