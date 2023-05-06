@@ -11,6 +11,7 @@ import (
 	"ferry/tools"
 	"ferry/tools/app"
 	"fmt"
+	"github.com/xuri/excelize/v2"
 	"strconv"
 	"time"
 
@@ -621,4 +622,89 @@ func SuspendWorkOrder(c *gin.Context) {
 	}
 
 	app.OK(c, nil, msg)
+}
+
+func CirculationList(c *gin.Context) {
+	/*
+		1. 待办工单
+		2. 我创建的
+		3. 我相关的
+		4. 所有工单
+	*/
+
+	var (
+		result      []service.CirculationInfo
+		err         error
+		classifyInt int
+	)
+
+	classify := c.DefaultQuery("classify", "")
+	if classify == "" {
+		app.Error(c, -1, errors.New("参数错误，请确认classify是否传递"), "")
+		return
+	}
+
+	classifyInt, _ = strconv.Atoi(classify)
+	w := service.WorkOrder{
+		Classify: classifyInt,
+		GinObj:   c,
+	}
+	result, err = w.WorkOrderCirculationList()
+	if err != nil {
+		app.Error(c, -1, err, fmt.Sprintf("查询工单数据失败，%v", err.Error()))
+		return
+	}
+
+	GenerateCirculationExcel(c, result)
+}
+
+func GenerateCirculationExcel(c *gin.Context, circulationList []service.CirculationInfo) {
+	sheetName := "Sheet1"
+	f := excelize.NewFile()
+	f.Path = "abc.xlsx"
+	defer func() {
+		if err := f.Close(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+	// 创建一个工作表
+	index, err := f.NewSheet(sheetName)
+	if err != nil {
+		app.Error(c, -1, err, fmt.Sprintf("生成excel失败， #{err.Error()}"))
+		return
+	}
+
+	// 设置工作簿的默认工作表
+	f.SetActiveSheet(index)
+	excelData := make([][]string, 0)
+
+	header := []string{"流程", "标题", "节点名称", "处理人", "创建时间", "完成时间", "挂起时间", "恢复时间"}
+	excelData = append(excelData, header)
+	for _, circulationInfo := range circulationList {
+		rowData := make([]string, 0)
+		rowData = append(rowData, circulationInfo.ProcessName)
+		rowData = append(rowData, circulationInfo.Title)
+		rowData = append(rowData, circulationInfo.State)
+		rowData = append(rowData, circulationInfo.Processor)
+		rowData = append(rowData, circulationInfo.CreateTime)
+		rowData = append(rowData, circulationInfo.EndTime)
+		rowData = append(rowData, circulationInfo.SuspendTime)
+		rowData = append(rowData, circulationInfo.ResumeTime)
+		excelData = append(excelData, rowData)
+	}
+
+	// 根据指定路径保存文件
+	for idx, row := range excelData {
+		cell, err := excelize.CoordinatesToCellName(1, idx+1)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		f.SetSheetRow(sheetName, cell, &row)
+	}
+
+	c.Writer.Header().Set("Content-Type", "application/octet-stream")
+	c.Writer.Header().Set("Content-Transfer-Encoding", "binary")
+	c.Writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", f.Path))
+	f.Write(c.Writer)
 }

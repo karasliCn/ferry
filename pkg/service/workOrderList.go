@@ -8,8 +8,9 @@ import (
 	"ferry/pkg/pagination"
 	"ferry/tools"
 	"fmt"
-
 	"github.com/gin-gonic/gin"
+	"github.com/jinzhu/gorm"
+	"strconv"
 )
 
 /*
@@ -30,6 +31,17 @@ type workOrderInfo struct {
 	ProcessName  string `json:"process_name"`
 }
 
+type CirculationInfo struct {
+	ProcessName string `json:"process_name"`
+	Title       string `json:"title"`
+	State       string `json:"state"`
+	Processor   string `json:"processor"`
+	CreateTime  string `json:"create_time"`
+	EndTime     string `json:"update_time"`
+	SuspendTime string `jaon:"suspend_time"`
+	ResumeTime  string `jaon:"resume_time"`
+}
+
 func NewWorkOrder(classify int, c *gin.Context) *WorkOrder {
 	return &WorkOrder{
 		Classify: classify,
@@ -40,7 +52,39 @@ func NewWorkOrder(classify int, c *gin.Context) *WorkOrder {
 func (w *WorkOrder) PureWorkOrderList() (result interface{}, err error) {
 	var (
 		workOrderInfoList []workOrderInfo
-		processorInfo     system.SysUser
+	)
+
+	db, err := w.buildQuery()
+
+	result, err = pagination.Paging(&pagination.Param{
+		C:  w.GinObj,
+		DB: db,
+	}, &workOrderInfoList, map[string]map[string]interface{}{}, "p_process_info")
+	if err != nil {
+		err = fmt.Errorf("查询工单列表失败，%v", err.Error())
+		return
+	}
+	return
+}
+
+func (w *WorkOrder) PureAllWorkOrderList() (result interface{}, err error) {
+	var (
+		workOrderInfoList []workOrderInfo
+	)
+
+	db, err := w.buildQuery()
+
+	err = db.Find(&workOrderInfoList).Error
+	if err != nil {
+		err = fmt.Errorf("查询工单列表失败，%v", err.Error())
+		return nil, err
+	}
+	return workOrderInfoList, nil
+}
+
+func (w *WorkOrder) buildQuery() (dbObj *gorm.DB, err error) {
+	var (
+		processorInfo system.SysUser
 	)
 
 	personSelectValue := "(JSON_CONTAINS(p_work_order_info.state, JSON_OBJECT('processor', %v)) and JSON_CONTAINS(p_work_order_info.state, JSON_OBJECT('process_method', 'person')))"
@@ -80,11 +124,11 @@ func (w *WorkOrder) PureWorkOrderList() (result interface{}, err error) {
 			Group("p_work_order_info.id")
 	}
 	if processor != "" && w.Classify != 1 {
-		err = orm.Eloquent.Model(&processorInfo).
+		err := orm.Eloquent.Model(&processorInfo).
 			Where("user_id = ?", processor).
 			Find(&processorInfo).Error
 		if err != nil {
-			return
+			return nil, err
 		}
 		db = db.Where(fmt.Sprintf("(%v or %v or %v) and p_work_order_info.is_end = 0",
 			fmt.Sprintf(personSelectValue, processorInfo.UserId),
@@ -108,11 +152,11 @@ func (w *WorkOrder) PureWorkOrderList() (result interface{}, err error) {
 
 		// 3. 部门
 		var userInfo system.SysUser
-		err = orm.Eloquent.Model(&system.SysUser{}).
+		err := orm.Eloquent.Model(&system.SysUser{}).
 			Where("user_id = ?", tools.GetUserId(w.GinObj)).
 			Find(&userInfo).Error
 		if err != nil {
-			return
+			return nil, err
 		}
 		departmentSelect := fmt.Sprintf(departmentSelectValue, userInfo.DeptId)
 
@@ -134,15 +178,7 @@ func (w *WorkOrder) PureWorkOrderList() (result interface{}, err error) {
 	db = db.Joins("left join p_process_info on p_work_order_info.process = p_process_info.id").
 		Select("p_work_order_info.*, p_process_info.name as process_name")
 
-	result, err = pagination.Paging(&pagination.Param{
-		C:  w.GinObj,
-		DB: db,
-	}, &workOrderInfoList, map[string]map[string]interface{}{}, "p_process_info")
-	if err != nil {
-		err = fmt.Errorf("查询工单列表失败，%v", err.Error())
-		return
-	}
-	return
+	return db, nil
 }
 
 func (w *WorkOrder) WorkOrderList() (result interface{}, err error) {
@@ -236,4 +272,70 @@ func (w *WorkOrder) WorkOrderList() (result interface{}, err error) {
 	result.(*pagination.Paginator).TotalCount -= minusTotal
 
 	return result, nil
+}
+
+func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err error) {
+
+	var (
+		circulationList []process.CirculationHistory
+		cirRes          []CirculationInfo
+	)
+
+	allWorkOder, err := w.PureAllWorkOrderList()
+	if err != nil {
+		return
+	}
+
+	workOrderIdList := make([]int64, 0)
+	workOrderInfoMap := make(map[int]workOrderInfo)
+
+	for _, v := range allWorkOder.([]workOrderInfo) {
+		workOrderIdList = append(workOrderIdList, int64(v.Id))
+		workOrderInfoMap[v.Id] = v
+	}
+
+	err = orm.Eloquent.Model(&process.CirculationHistory{}).Where(" work_order IN (?)", workOrderIdList).Find(&circulationList).Order("work_order desc create_time asc").Error
+	if err != nil {
+		return
+	}
+
+	userIdList := make([]string, 0)
+
+	for _, v := range circulationList {
+		woInfo, ok := workOrderInfoMap[v.WorkOrder]
+		if ok {
+			userIdList = append(userIdList, v.Processor)
+			cirInfo := CirculationInfo{
+				ProcessName: woInfo.ProcessName,
+				Title:       woInfo.Title,
+				State:       v.State,
+				Processor:   v.Processor,
+				CreateTime:  v.CreatedAt.Format("2006-01-02 15:04:05"),
+				EndTime:     v.UpdatedAt.Format("2006-01-02 15:04:05"),
+			}
+			if !v.SuspendTime.IsZero() {
+				cirInfo.SuspendTime = v.SuspendTime.Format("2006-01-02 15:04:05")
+			}
+			if !v.ResumeTime.IsZero() {
+				cirInfo.ResumeTime = v.ResumeTime.Format("2006-01-02 15:04:05")
+			}
+			cirRes = append(cirRes, cirInfo)
+		}
+	}
+
+	var userInfoList []system.SysUser
+	err = orm.Eloquent.Model(&system.SysUser{}).Where(" user_id IN (?)", userIdList).Find(&userInfoList).Error
+	if err != nil {
+		return
+	}
+	var userInfoMap = make(map[int]system.SysUser)
+	for _, userInfo := range userInfoList {
+		userInfoMap[userInfo.UserId] = userInfo
+	}
+	for _, cirInfo := range cirRes {
+		userId, _ := strconv.Atoi(cirInfo.Processor)
+		cirInfo.Processor = userInfoMap[userId].NickName
+	}
+
+	return cirRes, nil
 }

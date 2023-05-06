@@ -818,25 +818,24 @@ func (h *Handle) HandleWorkOrder(
 	err = json.Unmarshal(h.workOrderDetails.State, &woStateList)
 	for _, woState := range woStateList {
 		if woState["id"] == sourceState {
+			if woState["is_suspend"] == true {
+				h.tx.Rollback()
+				return
+			}
 			suspendTime, supOk := woState["suspend_time"]
 			resumeTime, resOk := woState["resume_time"]
 			if supOk && resOk {
-				parsedResumeTime, err := time.Parse("2006-01-02 15:04:05", resumeTime.(string))
-				if err != nil {
-
-				}
+				parsedResumeTime, _ := time.Parse("2006-01-02 15:04:05", resumeTime.(string))
 				jsonResumeTime := jsonTime.JSONTime{
-					parsedResumeTime,
+					Time: parsedResumeTime,
 				}
 				cirHistoryData.ResumeTime = jsonResumeTime
-				parsedSuspendTime, err := time.Parse("2006-01-02 15:04:05", suspendTime.(string))
-				if err != nil {
-
-				}
+				parsedSuspendTime, _ := time.Parse("2006-01-02 15:04:05", suspendTime.(string))
 				jsonSuspendTime := jsonTime.JSONTime{
-					parsedSuspendTime,
+					Time: parsedSuspendTime,
 				}
 				cirHistoryData.SuspendTime = jsonSuspendTime
+				break
 			}
 		}
 	}

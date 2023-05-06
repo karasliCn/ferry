@@ -137,6 +137,8 @@ CREATE TABLE `p_work_order_circulation_history` (
   `create_time` timestamp NULL DEFAULT NULL,
   `update_time` timestamp NULL DEFAULT NULL,
   `delete_time` timestamp NULL DEFAULT NULL,
+  `suspend_time` timestamp NULL DEFAULT NULL,
+  `resume_time` timestamp NULL DEFAULT NULL,
   `title` varchar(128) DEFAULT NULL,
   `work_order` int DEFAULT NULL,
   `state` varchar(128) DEFAULT NULL,
