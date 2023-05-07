@@ -65,7 +65,7 @@ func CreateWorkOrder(c *gin.Context) (err error) {
 	if err != nil {
 		return
 	}
-	err = GetVariableValueWithWorkOrderId(variableValue, tools.GetUserId(c), workOrderValue.Id)
+	err = GetVariableValueWithWorkOrderId(variableValue, tools.GetUserId(c), workOrderValue.Id, true)
 	if err != nil {
 		err = fmt.Errorf("获取处理人变量值失败，%v", err.Error())
 		return
@@ -193,7 +193,7 @@ func CreateWorkOrder(c *gin.Context) (err error) {
 	}
 
 	// 获取变量数据
-	err = GetVariableValueWithWorkOrderId(variableValue, tools.GetUserId(c), workOrderValue.Id)
+	err = GetVariableValueWithWorkOrderId(variableValue, tools.GetUserId(c), workOrderValue.Id, true)
 	if err != nil {
 		return
 	}

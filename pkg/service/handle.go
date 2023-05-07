@@ -182,7 +182,7 @@ func (h *Handle) circulation() (err error) {
 	for _, v := range h.updateValue["state"].([]map[string]interface{}) {
 		stateList = append(stateList, v)
 	}
-	err = GetVariableValueForCirculation(stateList, h)
+	err = GetVariableValueWithWorkOrderId(stateList, h.workOrderDetails.Creator, h.workOrderId, false)
 	if err != nil {
 		return
 	}
