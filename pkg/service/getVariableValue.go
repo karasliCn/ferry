@@ -43,7 +43,7 @@ func GetVariableValueWithWorkOrderId(stateList []interface{}, creator int, workO
 			}
 			stateItem.(map[string]interface{})["process_method"] = "person"
 		}
-		// lhz todo
+		// lhz add to support process_method "template"
 		if stateItem.(map[string]interface{})["process_method"] == "template" {
 			var fieldId string
 			if isCreate {
