@@ -7,7 +7,7 @@ settings:
     ishttps: false
     mode: dev
     name: ferry-test
-    port: "8002"
+    port: "9527"
     readtimeout: 1
     writertimeout: 2
   database:
