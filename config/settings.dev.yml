@@ -2,7 +2,7 @@ script:
   path: ./static/scripts
 settings:
   application:
-    domain: localhost:8002
+    domain: localhost:9527
     host: 0.0.0.0
     ishttps: false
     mode: dev
