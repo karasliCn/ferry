@@ -65,7 +65,8 @@ func CreateWorkOrder(c *gin.Context) (err error) {
 	if err != nil {
 		return
 	}
-	err = GetVariableValueWithWorkOrderId(variableValue, tools.GetUserId(c), workOrderValue.Id, true)
+	transformVariableValue(variableValue, workOrderValue.Tpls["form_data"])
+	err = GetVariableValueWithWorkOrderId(variableValue, tools.GetUserId(c), workOrderValue.Id)
 	if err != nil {
 		err = fmt.Errorf("获取处理人变量值失败，%v", err.Error())
 		return
@@ -192,8 +193,9 @@ func CreateWorkOrder(c *gin.Context) (err error) {
 		}
 	}
 
+	transformVariableValue(variableValue, workOrderValue.Tpls["form_data"])
 	// 获取变量数据
-	err = GetVariableValueWithWorkOrderId(variableValue, tools.GetUserId(c), workOrderValue.Id, true)
+	err = GetVariableValueWithWorkOrderId(variableValue, tools.GetUserId(c), workOrderValue.Id)
 	if err != nil {
 		return
 	}
@@ -370,4 +372,21 @@ func CreateWorkOrder(c *gin.Context) (err error) {
 	}
 
 	return
+}
+
+func transformVariableValue(variableValueList []interface{}, formData []interface{}) {
+	for _, variableValue := range variableValueList {
+		varValMap := variableValue.(map[string]interface{})
+		processMethod, ok := variableValue.(map[string]interface{})["process_method"]
+		if ok && processMethod.(string) == "template" {
+			fieldId := variableValue.(map[string]interface{})["processor"]
+			for _, form := range formData {
+				formValue, ok := form.(map[string]interface{})[fieldId.(string)]
+				if ok {
+					varValMap["processor"] = []interface{}{formValue}
+					varValMap["process_method"] = "person"
+				}
+			}
+		}
+	}
 }

@@ -12,7 +12,7 @@ import (
   @Author : lanyulei
 */
 
-func GetVariableValueWithWorkOrderId(stateList []interface{}, creator int, workOrderId int, isCreate bool) (err error) {
+func GetVariableValueWithWorkOrderId(stateList []interface{}, creator int, workOrderId int) (err error) {
 	var (
 		userInfo system.SysUser
 		deptInfo system.Dept
@@ -46,11 +46,8 @@ func GetVariableValueWithWorkOrderId(stateList []interface{}, creator int, workO
 		// lhz add to support process_method "template"
 		if stateItem.(map[string]interface{})["process_method"] == "template" {
 			var fieldId string
-			if isCreate {
-				fieldId = stateItem.(map[string]interface{})["processor"].(string)
-			} else {
-				fieldId = stateItem.(map[string]interface{})["processor"].([]interface{})[0].(string)
-			}
+			fieldId = stateItem.(map[string]interface{})["processor"].([]interface{})[0].(string)
+
 			var tplDataList []process.TplData
 			err := orm.Eloquent.Model(&process.TplData{}).Where(" work_order = ? ", workOrderId).Find(&tplDataList).Error
 			if err != nil {
@@ -76,4 +73,25 @@ func GetVariableValueWithWorkOrderId(stateList []interface{}, creator int, workO
 	}
 
 	return
+}
+
+func queryWorkOrderFormData(workOrderId int) ([]interface{}, error) {
+	var tplDataList []process.TplData
+	err := orm.Eloquent.Model(&process.TplData{}).Where(" work_order = ? ", workOrderId).Find(&tplDataList).Error
+	if err != nil {
+		logger.Error("tplData not found")
+		return nil, err
+	}
+	tplFormList := make([]interface{}, 0)
+	for _, tplData := range tplDataList {
+		tmp := make(map[string]interface{})
+		err = json.Unmarshal(tplData.FormData, &tmp)
+		if err != nil {
+			logger.Error("failed to unmarshal tplData")
+			return nil, err
+		}
+		tplFormList = append(tplFormList, tmp)
+	}
+	return tplFormList, nil
+
 }

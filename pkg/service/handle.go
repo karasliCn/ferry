@@ -182,7 +182,10 @@ func (h *Handle) circulation() (err error) {
 	for _, v := range h.updateValue["state"].([]map[string]interface{}) {
 		stateList = append(stateList, v)
 	}
-	err = GetVariableValueWithWorkOrderId(stateList, h.workOrderDetails.Creator, h.workOrderId, false)
+
+	workOrderDetail, err := queryWorkOrderFormData(h.workOrderId)
+	transformVariableValue(stateList, workOrderDetail)
+	err = GetVariableValueWithWorkOrderId(stateList, h.workOrderDetails.Creator, h.workOrderId)
 	if err != nil {
 		return
 	}
@@ -684,12 +687,12 @@ func (h *Handle) HandleWorkOrder(
 		}
 	case "userTask":
 		stateValue["process_method"] = h.targetStateValue["assignType"].(string)
-		if stateValue["process_method"] == "template" {
-			processorList := make([]interface{}, 0)
-			stateValue["processor"] = append(processorList, h.targetStateValue["assignValue"].(interface{}))
-		} else {
-			stateValue["processor"] = h.targetStateValue["assignValue"].([]interface{})
-		}
+		//if stateValue["process_method"] == "template" {
+		//	processorList := make([]interface{}, 0)
+		//	stateValue["processor"] = append(processorList, h.targetStateValue["assignValue"].(interface{}))
+		//} else {
+		stateValue["processor"] = h.targetStateValue["assignValue"]
+		//}
 		h.updateValue["state"] = []map[string]interface{}{stateValue}
 		err = h.commonProcessing(c)
 		if err != nil {
@@ -697,12 +700,12 @@ func (h *Handle) HandleWorkOrder(
 		}
 	case "receiveTask":
 		stateValue["process_method"] = h.targetStateValue["assignType"].(string)
-		if stateValue["process_method"] == "template" {
-			processorList := make([]interface{}, 0)
-			stateValue["processor"] = append(processorList, h.targetStateValue["assignValue"].(interface{}))
-		} else {
-			stateValue["processor"] = h.targetStateValue["assignValue"].([]interface{})
-		}
+		//if stateValue["process_method"] == "template" {
+		//	processorList := make([]interface{}, 0)
+		//	stateValue["processor"] = append(processorList, h.targetStateValue["assignValue"].(interface{}))
+		//} else {
+		stateValue["processor"] = h.targetStateValue["assignValue"]
+		//}
 		h.updateValue["state"] = []map[string]interface{}{stateValue}
 		err = h.commonProcessing(c)
 		if err != nil {
@@ -930,27 +933,30 @@ func (h *Handle) HandleWorkOrder(
 	// 发送通知
 	if len(noticeList) > 0 {
 		stateList := make([]interface{}, 0)
-		for _, v := range h.updateValue["state"].([]map[string]interface{}) {
-			stateList = append(stateList, v)
-		}
-		sendToUserList, err = GetPrincipalUserInfo(stateList, h.workOrderDetails.Creator)
-		if err != nil {
-			return
-		}
-
-		bodyData.SendTo = map[string]interface{}{
-			"userList": sendToUserList,
-		}
-		bodyData.Subject = sendSubject
-		bodyData.Description = sendDescription
-
-		// 发送通知
-		go func(bodyData notify.BodyData) {
-			err = bodyData.SendNotify()
+		_, ok := h.updateValue["state"]
+		if ok {
+			for _, v := range h.updateValue["state"].([]map[string]interface{}) {
+				stateList = append(stateList, v)
+			}
+			sendToUserList, err = GetPrincipalUserInfo(stateList, h.workOrderDetails.Creator)
 			if err != nil {
 				return
 			}
-		}(bodyData)
+
+			bodyData.SendTo = map[string]interface{}{
+				"userList": sendToUserList,
+			}
+			bodyData.Subject = sendSubject
+			bodyData.Description = sendDescription
+
+			// 发送通知
+			go func(bodyData notify.BodyData) {
+				err = bodyData.SendNotify()
+				if err != nil {
+					return
+				}
+			}(bodyData)
+		}
 	}
 
 	if isExecTask {

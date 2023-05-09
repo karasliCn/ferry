@@ -2,12 +2,12 @@ script:
   path: ./static/scripts
 settings:
   application:
-    domain: localhost:9527
+    domain: localhost:8002
     host: 0.0.0.0
     ishttps: false
     mode: dev
     name: ferry
-    port: "9527"
+    port: "8002"
     readtimeout: 1
     writertimeout: 2
   database:
@@ -22,10 +22,10 @@ settings:
     url: localhost:9527
   email:
     alias: ferry
-    host: smtp.163.com
-    pass: your password
-    port: 465
-    user: fdevops@163.com
+    host: mail.gacfinance.com.cn
+    pass: K@ras147
+    port: 25
+    user: lihanzhao@gacfinance.com.cn
   gorm:
     logmode: 0
     maxidleconn: 0
@@ -55,7 +55,7 @@ settings:
   public:
     islocation: 0
   redis:
-    url: redis://ferry_redis:6379
+    url: redis://localhost:6379
   ssl:
     key: keystring
     pem: temp/pem.pem
