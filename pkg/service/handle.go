@@ -7,6 +7,7 @@ import (
 	"ferry/models/base"
 	"ferry/models/process"
 	"ferry/models/system"
+	"ferry/pkg/constants"
 	"ferry/pkg/jsonTime"
 	"ferry/pkg/notify"
 	"ferry/tools"
@@ -818,12 +819,12 @@ func (h *Handle) HandleWorkOrder(
 			suspendTime, supOk := woState["suspend_time"]
 			resumeTime, resOk := woState["resume_time"]
 			if supOk && resOk {
-				parsedResumeTime, _ := time.Parse("2006-01-02 15:04:05", resumeTime.(string))
+				parsedResumeTime, _ := time.Parse(constants.TimeFormat, resumeTime.(string))
 				jsonResumeTime := jsonTime.JSONTime{
 					Time: parsedResumeTime,
 				}
 				cirHistoryData.ResumeTime = jsonResumeTime
-				parsedSuspendTime, _ := time.Parse("2006-01-02 15:04:05", suspendTime.(string))
+				parsedSuspendTime, _ := time.Parse(constants.TimeFormat, suspendTime.(string))
 				jsonSuspendTime := jsonTime.JSONTime{
 					Time: parsedSuspendTime,
 				}
@@ -870,7 +871,7 @@ func (h *Handle) HandleWorkOrder(
 		Title:       h.workOrderDetails.Title,
 		Creator:     applyUserInfo.NickName,
 		Priority:    h.workOrderDetails.Priority,
-		CreatedAt:   h.workOrderDetails.CreatedAt.Format("2006-01-02 15:04:05"),
+		CreatedAt:   h.workOrderDetails.CreatedAt.Format(constants.TimeFormat),
 	}
 
 	// 判断目标是否是结束节点
@@ -1018,11 +1019,11 @@ func (h *Handle) SuspendWorkOrder(
 	}
 	if isSuspend {
 		targetState["is_suspend"] = true
-		targetState["suspend_time"] = time.Now().Format("2006-01-02 15:04:05")
+		targetState["suspend_time"] = time.Now().Format(constants.TimeFormat)
 		delete(targetState, "resume_time")
 	} else {
 		targetState["is_suspend"] = false
-		targetState["resume_time"] = time.Now().Format("2006-01-02 15:04:05")
+		targetState["resume_time"] = time.Now().Format(constants.TimeFormat)
 	}
 
 	stateMarshalVal, err := json.Marshal(stateValue)

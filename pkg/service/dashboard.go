@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"ferry/global/orm"
 	"ferry/models/process"
+	"ferry/pkg/constants"
 	"ferry/pkg/pagination"
 	"fmt"
 	"strings"
@@ -49,8 +50,8 @@ func (s *Statistics) DateRangeStatistics() (statisticsData map[string][]interfac
 	)
 
 	// 计算两个时间的差
-	startTime, _ = time.Parse("2006-01-02 15:04:05", s.StartTime)
-	endTime, _ = time.Parse("2006-01-02 15:04:05", fmt.Sprintf("%s 00:00:00", strings.Split(s.EndTime, " ")[0]))
+	startTime, _ = time.Parse(constants.TimeFormat, s.StartTime)
+	endTime, _ = time.Parse(constants.TimeFormat, fmt.Sprintf("%s 00:00:00", strings.Split(s.EndTime, " ")[0]))
 	TimeDifference = int(endTime.Sub(startTime).Hours() / 24)
 
 	for i := 0; i < TimeDifference; i++ {
@@ -58,14 +59,14 @@ func (s *Statistics) DateRangeStatistics() (statisticsData map[string][]interfac
 			sqlDataValue += fmt.Sprintf("SELECT date_sub(date_format( '%s', '%%Y%%m%%d'), INTERVAL 0 DAY ) AS click_date UNION ALL", endTime)
 		} else if i == TimeDifference-1 {
 			sqlDataValue += fmt.Sprintf(` SELECT date_sub(date_format( '%s', '%%Y%%m%%d'), INTERVAL %d DAY ) AS click_date UNION ALL`, endTime, i)
-			sqlDataValue += fmt.Sprintf(` SELECT date_sub(date_format( '%s', '%%Y%%m%%d'), INTERVAL %d DAY ) AS click_date`, endTime, i + 1)
+			sqlDataValue += fmt.Sprintf(` SELECT date_sub(date_format( '%s', '%%Y%%m%%d'), INTERVAL %d DAY ) AS click_date`, endTime, i+1)
 		} else {
 			sqlDataValue += fmt.Sprintf(` SELECT date_sub(date_format( '%s', '%%Y%%m%%d'), INTERVAL %d DAY ) AS click_date UNION ALL`, endTime, i)
 		}
 	}
 
 	if TimeDifference == 1 {
-		sqlDataValue +=  fmt.Sprintf(" SELECT date_sub(date_format( '%s', '%%Y%%m%%d'), INTERVAL 1 DAY ) AS click_date",endTime)
+		sqlDataValue += fmt.Sprintf(" SELECT date_sub(date_format( '%s', '%%Y%%m%%d'), INTERVAL 1 DAY ) AS click_date", endTime)
 	}
 
 	sqlValue = fmt.Sprintf(`SELECT

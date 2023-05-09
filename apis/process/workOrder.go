@@ -6,6 +6,7 @@ import (
 	"ferry/global/orm"
 	"ferry/models/process"
 	"ferry/models/system"
+	"ferry/pkg/constants"
 	"ferry/pkg/notify"
 	"ferry/pkg/service"
 	"ferry/tools"
@@ -401,7 +402,7 @@ func UrgeWorkOrder(c *gin.Context) {
 		Title:       workOrderInfo.Title,
 		Creator:     userInfo.NickName,
 		Priority:    workOrderInfo.Priority,
-		CreatedAt:   workOrderInfo.CreatedAt.Format("2006-01-02 15:04:05"),
+		CreatedAt:   workOrderInfo.CreatedAt.Format(constants.TimeFormat),
 	}
 	err = bodyData.SendNotify()
 	if err != nil {

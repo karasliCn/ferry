@@ -5,6 +5,7 @@ import (
 	"ferry/global/orm"
 	"ferry/models/process"
 	"ferry/models/system"
+	"ferry/pkg/constants"
 	"ferry/pkg/pagination"
 	"ferry/tools"
 	"fmt"
@@ -300,30 +301,34 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 	}
 
 	userIdList := make([]string, 0)
-	processedCirMap := make(map[int]string)
+	var currentWorkOrderId int
+	var lastEndTime string
 	for _, v := range circulationList {
 		woInfo, ok := workOrderInfoMap[v.WorkOrder]
 		if ok {
+			if currentWorkOrderId != v.WorkOrder {
+				currentWorkOrderId = v.WorkOrder
+				lastEndTime = ""
+			}
 			userIdList = append(userIdList, v.Processor)
 			cirInfo := CirculationInfo{
 				ProcessName: woInfo.ProcessName,
 				Title:       woInfo.Title,
 				State:       v.State,
 				Processor:   v.Processor,
-				EndTime:     v.CreatedAt.Format("2006-01-02 15:04:05"),
+				EndTime:     v.CreatedAt.Format(constants.TimeFormat),
 			}
-			lastEndTime, tok := processedCirMap[v.WorkOrder]
-			if !tok {
-				cirInfo.CreateTime = woInfo.CreatedAt.Format("2006-01-02 15:04:05")
+			if lastEndTime == "" {
+				cirInfo.CreateTime = woInfo.CreatedAt.Format(constants.TimeFormat)
 			} else {
 				cirInfo.CreateTime = lastEndTime
 			}
-			processedCirMap[v.WorkOrder] = cirInfo.EndTime
+			lastEndTime = cirInfo.EndTime
 			if !v.SuspendTime.IsZero() {
-				cirInfo.SuspendTime = v.SuspendTime.Format("2006-01-02 15:04:05")
+				cirInfo.SuspendTime = v.SuspendTime.Format(constants.TimeFormat)
 			}
 			if !v.ResumeTime.IsZero() {
-				cirInfo.ResumeTime = v.ResumeTime.Format("2006-01-02 15:04:05")
+				cirInfo.ResumeTime = v.ResumeTime.Format(constants.TimeFormat)
 			}
 			cirRes = append(cirRes, cirInfo)
 		}

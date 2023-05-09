@@ -6,6 +6,7 @@ import (
 	"ferry/global/orm"
 	"ferry/models/process"
 	"ferry/models/system"
+	"ferry/pkg/constants"
 	"ferry/pkg/notify"
 	"ferry/tools"
 	"fmt"
@@ -340,7 +341,7 @@ func CreateWorkOrder(c *gin.Context) (err error) {
 				Title:       workOrderValue.Title,
 				Creator:     userInfo.NickName,
 				Priority:    workOrderValue.Priority,
-				CreatedAt:   time.Now().Format("2006-01-02 15:04:05"),
+				CreatedAt:   time.Now().Format(constants.TimeFormat),
 			}
 			err = bodyData.SendNotify()
 			if err != nil {
