@@ -687,12 +687,7 @@ func (h *Handle) HandleWorkOrder(
 		}
 	case "userTask":
 		stateValue["process_method"] = h.targetStateValue["assignType"].(string)
-		//if stateValue["process_method"] == "template" {
-		//	processorList := make([]interface{}, 0)
-		//	stateValue["processor"] = append(processorList, h.targetStateValue["assignValue"].(interface{}))
-		//} else {
 		stateValue["processor"] = h.targetStateValue["assignValue"]
-		//}
 		h.updateValue["state"] = []map[string]interface{}{stateValue}
 		err = h.commonProcessing(c)
 		if err != nil {
@@ -700,12 +695,7 @@ func (h *Handle) HandleWorkOrder(
 		}
 	case "receiveTask":
 		stateValue["process_method"] = h.targetStateValue["assignType"].(string)
-		//if stateValue["process_method"] == "template" {
-		//	processorList := make([]interface{}, 0)
-		//	stateValue["processor"] = append(processorList, h.targetStateValue["assignValue"].(interface{}))
-		//} else {
 		stateValue["processor"] = h.targetStateValue["assignValue"]
-		//}
 		h.updateValue["state"] = []map[string]interface{}{stateValue}
 		err = h.commonProcessing(c)
 		if err != nil {

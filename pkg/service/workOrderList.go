@@ -300,7 +300,7 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 	}
 
 	userIdList := make([]string, 0)
-
+	processedCirMap := make(map[int]string)
 	for _, v := range circulationList {
 		woInfo, ok := workOrderInfoMap[v.WorkOrder]
 		if ok {
@@ -310,9 +310,15 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 				Title:       woInfo.Title,
 				State:       v.State,
 				Processor:   v.Processor,
-				CreateTime:  v.CreatedAt.Format("2006-01-02 15:04:05"),
-				EndTime:     v.UpdatedAt.Format("2006-01-02 15:04:05"),
+				EndTime:     v.CreatedAt.Format("2006-01-02 15:04:05"),
 			}
+			lastEndTime, tok := processedCirMap[v.WorkOrder]
+			if !tok {
+				cirInfo.CreateTime = woInfo.CreatedAt.Format("2006-01-02 15:04:05")
+			} else {
+				cirInfo.CreateTime = lastEndTime
+			}
+			processedCirMap[v.WorkOrder] = cirInfo.EndTime
 			if !v.SuspendTime.IsZero() {
 				cirInfo.SuspendTime = v.SuspendTime.Format("2006-01-02 15:04:05")
 			}
