@@ -294,7 +294,7 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 		workOrderInfoMap[v.Id] = v
 	}
 
-	err = orm.Eloquent.Model(&process.CirculationHistory{}).Where(" work_order IN (?)", workOrderIdList).Find(&circulationList).Order("work_order desc create_time asc").Error
+	err = orm.Eloquent.Model(&process.CirculationHistory{}).Where(" work_order IN (?)", workOrderIdList).Order("work_order DESC, id ASC").Find(&circulationList).Error
 	if err != nil {
 		return
 	}
