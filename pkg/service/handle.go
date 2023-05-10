@@ -53,6 +53,7 @@ type Handle struct {
 	circulationValue string
 	processState     ProcessState
 	tx               *gorm.DB
+	tplDataList      []interface{}
 }
 
 // 会签
@@ -184,11 +185,13 @@ func (h *Handle) circulation() (err error) {
 		stateList = append(stateList, v)
 	}
 
-	workOrderDetail, err := queryWorkOrderFormData(h.workOrderId)
-	transformVariableValue(stateList, workOrderDetail)
+	err = transformVariableValue(stateList, h.tplDataList)
+	if err != nil {
+		return err
+	}
 	err = GetVariableValueWithWorkOrderId(stateList, h.workOrderDetails.Creator, h.workOrderId)
 	if err != nil {
-		return
+		return err
 	}
 
 	stateValue, err = json.Marshal(h.updateValue["state"])
@@ -415,6 +418,7 @@ func (h *Handle) HandleWorkOrder(
 	h.workOrderId = workOrderId
 	h.flowProperties = flowProperties
 	h.endHistory = true
+	h.tplDataList = make([]interface{}, 0)
 
 	var (
 		execTasks          []string
@@ -548,6 +552,13 @@ func (h *Handle) HandleWorkOrder(
 	sourceEdges, err = h.processState.GetEdge(h.targetStateValue["id"].(string), "source")
 	if err != nil {
 		return
+	}
+
+	for _, t := range tpls {
+		tplValue, ok := t["tplValue"]
+		if ok {
+			h.tplDataList = append(h.tplDataList, tplValue.(map[string]interface{}))
+		}
 	}
 
 	switch h.targetStateValue["clazz"] {

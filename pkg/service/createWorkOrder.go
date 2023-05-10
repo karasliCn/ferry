@@ -375,7 +375,7 @@ func CreateWorkOrder(c *gin.Context) (err error) {
 	return
 }
 
-func transformVariableValue(variableValueList []interface{}, formData []interface{}) {
+func transformVariableValue(variableValueList []interface{}, formData []interface{}) (err error) {
 	for _, variableValue := range variableValueList {
 		varValMap := variableValue.(map[string]interface{})
 		processMethod, ok := variableValue.(map[string]interface{})["process_method"]
@@ -383,11 +383,16 @@ func transformVariableValue(variableValueList []interface{}, formData []interfac
 			fieldId := variableValue.(map[string]interface{})["processor"]
 			for _, form := range formData {
 				formValue, ok := form.(map[string]interface{})[fieldId.(string)]
-				if ok {
+				if ok && formValue != "" {
 					varValMap["processor"] = []interface{}{formValue}
 					varValMap["process_method"] = "person"
 				}
 			}
+			if varValMap["process_method"] != "template" {
+				return nil
+			}
+			return errors.New("下一节点处理人未指定")
 		}
 	}
+	return nil
 }
