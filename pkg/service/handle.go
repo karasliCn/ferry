@@ -374,7 +374,7 @@ func (h *Handle) commonProcessing(c *gin.Context) (err error) {
 	}
 
 	// 会签
-	if h.stateValue["assignValue"] != nil && len(h.stateValue["assignValue"].([]interface{})) > 0 {
+	if h.stateValue["assignType"] != "template" && h.stateValue["assignValue"] != nil && len(h.stateValue["assignValue"].([]interface{})) > 0 {
 		if isCounterSign, ok := h.stateValue["isCounterSign"]; ok {
 			if isCounterSign.(bool) {
 				h.endHistory = false
@@ -701,6 +701,17 @@ func (h *Handle) HandleWorkOrder(
 		stateValue["process_method"] = h.targetStateValue["assignType"].(string)
 		stateValue["processor"] = h.targetStateValue["assignValue"]
 		h.updateValue["state"] = []map[string]interface{}{stateValue}
+
+		var currentWoStateList []map[string]interface{}
+		err = json.Unmarshal(h.workOrderDetails.State, &currentWoStateList)
+		if len(currentWoStateList) > 1 {
+			for _, curWoState := range currentWoStateList {
+				if curWoState["id"] != h.stateValue["id"] {
+					h.updateValue["state"] = append(h.updateValue["state"].([]map[string]interface{}), curWoState)
+				}
+			}
+		}
+
 		err = h.commonProcessing(c)
 		if err != nil {
 			return
@@ -709,6 +720,15 @@ func (h *Handle) HandleWorkOrder(
 		stateValue["process_method"] = h.targetStateValue["assignType"].(string)
 		stateValue["processor"] = h.targetStateValue["assignValue"]
 		h.updateValue["state"] = []map[string]interface{}{stateValue}
+
+		var currentWoStateList []map[string]interface{}
+		err = json.Unmarshal(h.workOrderDetails.State, &currentWoStateList)
+		for _, curWoState := range currentWoStateList {
+			if curWoState["id"] != h.stateValue["id"] {
+				h.updateValue["state"] = append(h.updateValue["state"].([]map[string]interface{}), curWoState)
+			}
+		}
+
 		err = h.commonProcessing(c)
 		if err != nil {
 			return

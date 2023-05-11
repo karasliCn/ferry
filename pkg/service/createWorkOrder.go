@@ -388,10 +388,9 @@ func transformVariableValue(variableValueList []interface{}, formData []interfac
 					varValMap["process_method"] = "person"
 				}
 			}
-			if varValMap["process_method"] != "template" {
-				return nil
+			if varValMap["process_method"] == "template" {
+				return errors.New("下一节点处理人未指定")
 			}
-			return errors.New("下一节点处理人未指定")
 		}
 	}
 	return nil
