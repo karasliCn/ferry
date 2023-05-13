@@ -25,6 +25,7 @@ type CirculationHistory struct {
 	Remarks      string            `gorm:"column:remarks; type: longtext" json:"remarks" form:"remarks"`                  // 备注
 	SuspendTime  jsonTime.JSONTime `gorm:"column:suspend_time" json:"suspend_time" form:"suspend_time"`
 	ResumeTime   jsonTime.JSONTime `gorm:"column:resume_time" json:"resume_time" form:"resume_time"`
+	IsEffect     int               `gorm:"column:is_effect; type: int(11)" json:"is_effect" form:"is_effect"`
 }
 
 func (CirculationHistory) TableName() string {

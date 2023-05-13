@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
-	"strconv"
 )
 
 /*
@@ -33,14 +32,16 @@ type workOrderInfo struct {
 }
 
 type CirculationInfo struct {
-	ProcessName string `json:"process_name"`
-	Title       string `json:"title"`
-	State       string `json:"state"`
-	Processor   string `json:"processor"`
-	CreateTime  string `json:"create_time"`
-	EndTime     string `json:"update_time"`
-	SuspendTime string `jaon:"suspend_time"`
-	ResumeTime  string `jaon:"resume_time"`
+	ProcessName    string `json:"process_name"`
+	Title          string `json:"title"`
+	State          string `json:"state"`
+	Processor      string `json:"processor"`
+	CreateTime     string `json:"create_time"`
+	EndTime        string `json:"update_time"`
+	SuspendTime    string `json:"suspend_time"`
+	ResumeTime     string `json:"resume_time"`
+	ProcessorIds   []int  `json:"processor_ids"`
+	ProcessorNames string `json:"processor_names"`
 }
 
 func NewWorkOrder(classify int, c *gin.Context) *WorkOrder {
@@ -139,41 +140,6 @@ func (w *WorkOrder) buildQuery() (dbObj *gorm.DB, err error) {
 	}
 	if priority != "" {
 		db = db.Where("p_work_order_info.priority = ?", priority)
-	}
-
-	// 获取当前用户信息
-	switch w.Classify {
-	case 1:
-		// 待办工单
-		// 1. 个人
-		personSelect := fmt.Sprintf(personSelectValue, tools.GetUserId(w.GinObj))
-
-		// 2. 角色
-		roleSelect := fmt.Sprintf(roleSelectValue, tools.GetRoleId(w.GinObj))
-
-		// 3. 部门
-		var userInfo system.SysUser
-		err := orm.Eloquent.Model(&system.SysUser{}).
-			Where("user_id = ?", tools.GetUserId(w.GinObj)).
-			Find(&userInfo).Error
-		if err != nil {
-			return nil, err
-		}
-		departmentSelect := fmt.Sprintf(departmentSelectValue, userInfo.DeptId)
-
-		// 4. 变量会转成个人数据
-		//db = db.Where(fmt.Sprintf("(%v or %v or %v or %v) and is_end = 0", personSelect, personGroupSelect, departmentSelect, variableSelect))
-		db = db.Where(fmt.Sprintf("(%v or %v or %v) and p_work_order_info.is_end = 0", personSelect, roleSelect, departmentSelect))
-	case 2:
-		// 我创建的
-		db = db.Where("p_work_order_info.creator = ?", tools.GetUserId(w.GinObj))
-	case 3:
-		// 我相关的
-		db = db.Where(fmt.Sprintf("JSON_CONTAINS(p_work_order_info.related_person, '%v')", tools.GetUserId(w.GinObj)))
-	case 4:
-	// 所有工单
-	default:
-		return nil, fmt.Errorf("请确认查询的数据类型是否正确")
 	}
 
 	db = db.Joins("left join p_process_info on p_work_order_info.process = p_process_info.id").
@@ -295,12 +261,12 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 		workOrderInfoMap[v.Id] = v
 	}
 
-	err = orm.Eloquent.Model(&process.CirculationHistory{}).Where(" work_order IN (?)", workOrderIdList).Order("work_order DESC, id ASC").Find(&circulationList).Error
+	err = orm.Eloquent.Model(&process.CirculationHistory{}).Where(" work_order IN (?)", workOrderIdList).Order("work_order DESC, id DESC").Find(&circulationList).Error
 	if err != nil {
 		return
 	}
 
-	userIdList := make([]string, 0)
+	userIdList := make([]int, 0)
 	var currentWorkOrderId int
 	var lastEndTime string
 	for _, v := range circulationList {
@@ -309,14 +275,39 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 			if currentWorkOrderId != v.WorkOrder {
 				currentWorkOrderId = v.WorkOrder
 				lastEndTime = ""
+				state := make([]map[string]interface{}, 0)
+				json.Unmarshal(woInfo.State, &state)
+				for _, s := range state {
+					cirInfo := CirculationInfo{
+						ProcessName:  woInfo.ProcessName,
+						ProcessorIds: []int{},
+						Title:        woInfo.Title,
+						State:        s["label"].(string),
+						CreateTime:   woInfo.UpdatedAt.Format(constants.TimeFormat),
+					}
+					for _, processor := range s["processor"].([]interface{}) {
+						cirInfo.ProcessorIds = append(cirInfo.ProcessorIds, int(processor.(float64)))
+					}
+					userIdList = append(userIdList, cirInfo.ProcessorIds...)
+					susTime, sok := s["suspend_time"].(string)
+					if sok {
+						cirInfo.SuspendTime = susTime
+					}
+					resTime, rok := s["resume_time"].(string)
+					if rok {
+						cirInfo.ResumeTime = resTime
+					}
+					cirRes = append(cirRes, cirInfo)
+				}
+
 			}
-			userIdList = append(userIdList, v.Processor)
 			cirInfo := CirculationInfo{
-				ProcessName: woInfo.ProcessName,
-				Title:       woInfo.Title,
-				State:       v.State,
-				Processor:   v.Processor,
-				EndTime:     v.CreatedAt.Format(constants.TimeFormat),
+				ProcessName:    woInfo.ProcessName,
+				Title:          woInfo.Title,
+				State:          v.State,
+				Processor:      v.Processor,
+				EndTime:        v.CreatedAt.Format(constants.TimeFormat),
+				ProcessorNames: v.Processor,
 			}
 			if lastEndTime == "" {
 				cirInfo.CreateTime = woInfo.CreatedAt.Format(constants.TimeFormat)
@@ -343,9 +334,15 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 	for _, userInfo := range userInfoList {
 		userInfoMap[userInfo.UserId] = userInfo
 	}
-	for _, cirInfo := range cirRes {
-		userId, _ := strconv.Atoi(cirInfo.Processor)
-		cirInfo.Processor = userInfoMap[userId].NickName
+	for idx, cirInfo := range cirRes {
+		if len(cirInfo.ProcessorIds) > 0 {
+			for i, userId := range cirInfo.ProcessorIds {
+				if i > 0 {
+					cirRes[idx].ProcessorNames = cirInfo.ProcessorNames + ", "
+				}
+				cirRes[idx].ProcessorNames = cirInfo.ProcessorNames + userInfoMap[userId].NickName
+			}
+		}
 	}
 
 	return cirRes, nil

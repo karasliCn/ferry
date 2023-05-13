@@ -126,16 +126,16 @@ func ProcessStructure(c *gin.Context, processId int, workOrderId int) (result ma
 		if len(stateList) > 1 {
 		continueHistoryTag:
 			for _, v := range workOrderHistory {
-				status := false
+				if v.IsEffect != 1 {
+					continue
+				}
 				for i, s := range stateList {
+					// 并行节点，已审批，未流转的，state中移除
 					if v.Source == s["id"].(string) && v.Target != "" {
-						status = true
+						//status = true
 						stateList = append(stateList[:i], stateList[i+1:]...)
 						continue continueHistoryTag
 					}
-				}
-				if !status {
-					break
 				}
 			}
 		}

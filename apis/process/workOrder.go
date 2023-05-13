@@ -686,7 +686,7 @@ func GenerateCirculationExcel(c *gin.Context, circulationList []service.Circulat
 		rowData = append(rowData, circulationInfo.ProcessName)
 		rowData = append(rowData, circulationInfo.Title)
 		rowData = append(rowData, circulationInfo.State)
-		rowData = append(rowData, circulationInfo.Processor)
+		rowData = append(rowData, circulationInfo.ProcessorNames)
 		rowData = append(rowData, circulationInfo.CreateTime)
 		rowData = append(rowData, circulationInfo.EndTime)
 		rowData = append(rowData, circulationInfo.SuspendTime)

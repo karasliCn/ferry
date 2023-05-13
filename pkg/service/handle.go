@@ -330,30 +330,37 @@ func (h *Handle) ConditionalJudgment(condExpr map[string]interface{}) (result bo
 }
 
 // 并行网关，确认其他节点是否完成
-func (h *Handle) completeAllParallel(target string) (statusOk bool, err error) {
+func (h *Handle) completeAllParallel(target string, targetEdges []map[string]interface{}) (statusOk bool, err error) {
 	var (
 		stateList []map[string]interface{}
 	)
 
-	err = json.Unmarshal(h.workOrderDetails.State, &stateList)
-	if err != nil {
-		err = fmt.Errorf("反序列化失败，%v", err.Error())
-		return
+	historyList := make([]process.CirculationHistory, 0)
+
+	for _, tarEdge := range targetEdges {
+		state := make(map[string]interface{})
+		state["id"] = tarEdge["source"]
+		stateList = append(stateList, state)
+		for _, history := range h.cirHistoryList {
+			if history.Source == tarEdge["source"] && history.Target == target {
+				historyList = append(historyList, history)
+			}
+		}
 	}
 
 continueHistoryTag:
-	for _, v := range h.cirHistoryList {
-		status := false
+	for _, v := range historyList {
+		if v.IsEffect != 1 {
+			continue
+		}
 		for i, s := range stateList {
 			if v.Source == s["id"].(string) && v.Target == target {
-				status = true
+				//status = true
 				stateList = append(stateList[:i], stateList[i+1:]...)
 				continue continueHistoryTag
 			}
 		}
-		if !status {
-			break
-		}
+
 	}
 
 	if len(stateList) == 1 && stateList[0]["id"].(string) == h.stateValue["id"] {
@@ -367,6 +374,48 @@ func (h *Handle) commonProcessing(c *gin.Context) (err error) {
 	// 如果是拒绝的流转则直接跳转
 	if h.flowProperties == 0 {
 		err = h.circulation()
+		if err != nil {
+			err = fmt.Errorf("工单跳转失败，%v", err.Error())
+		}
+		edgeMap := make(map[string][]string)
+
+		var processInfo process.Info
+		err = orm.Eloquent.Model(&process.Info{}).Where(" id = ?", h.workOrderDetails.Process).Find(&processInfo).Error
+		if err != nil {
+			err = fmt.Errorf("工单跳转失败，%v", err.Error())
+		}
+
+		toCheckNodes := []string{h.targetStateValue["id"].(string)}
+		inEffectSource := []string{h.targetStateValue["id"].(string)}
+		procStruc := make(map[string]interface{})
+		_ = json.Unmarshal(processInfo.Structure, &procStruc)
+		procEdges := procStruc["edges"].([]interface{})
+		for i := range procEdges {
+			edge := procEdges[i].(map[string]interface{})
+			if edge["flowProperties"] == "1" {
+				source := edge["source"].(string)
+				targets, ok := edgeMap[source]
+				if !ok {
+					edgeMap[source] = []string{edge["target"].(string)}
+				} else {
+					edgeMap[source] = append(targets, edge["target"].(string))
+				}
+			}
+		}
+
+		for {
+			if len(toCheckNodes) == 0 {
+				break
+			}
+			targets, ok := edgeMap[toCheckNodes[0]]
+			if ok {
+				inEffectSource = append(inEffectSource, targets...)
+				toCheckNodes = append(toCheckNodes, targets...)
+			}
+			toCheckNodes = append(toCheckNodes[1:])
+		}
+
+		err = orm.Eloquent.Model(&process.CirculationHistory{}).Where(" work_order = ? and source in (?) and is_effect = 1", h.workOrderId, inEffectSource).Update("is_effect", 0).Error
 		if err != nil {
 			err = fmt.Errorf("工单跳转失败，%v", err.Error())
 		}
@@ -643,6 +692,17 @@ func (h *Handle) HandleWorkOrder(
 					"process_method": targetStateValue["assignType"],
 				})
 			}
+
+			var currentWoStateList []map[string]interface{}
+			err = json.Unmarshal(h.workOrderDetails.State, &currentWoStateList)
+			if len(currentWoStateList) > 1 {
+				for _, curWoState := range currentWoStateList {
+					if curWoState["id"] != h.stateValue["id"] {
+						h.updateValue["state"] = append(h.updateValue["state"].([]map[string]interface{}), curWoState)
+					}
+				}
+			}
+
 			err = h.circulation()
 			if err != nil {
 				err = fmt.Errorf("工单跳转失败，%v", err.Error())
@@ -650,7 +710,7 @@ func (h *Handle) HandleWorkOrder(
 			}
 		} else if len(sourceEdges) == 1 && len(targetEdges) > 1 {
 			// 出口
-			parallelStatusOk, err = h.completeAllParallel(sourceEdges[0]["target"].(string))
+			parallelStatusOk, err = h.completeAllParallel(sourceEdges[0]["target"].(string), targetEdges)
 			if err != nil {
 				err = fmt.Errorf("并行检测失败，%v", err.Error())
 				return
@@ -673,6 +733,25 @@ func (h *Handle) HandleWorkOrder(
 					"processor":      endAssignValue,
 					"process_method": endAssignType,
 				}}
+
+				var currentWoStateList []map[string]interface{}
+				err = json.Unmarshal(h.workOrderDetails.State, &currentWoStateList)
+				if len(currentWoStateList) > 1 {
+					for _, curWoState := range currentWoStateList {
+						if curWoState["id"] != h.stateValue["id"] {
+							isInTarEdge := false
+							for _, tarEdge := range targetEdges {
+								if tarEdge["source"] == curWoState["id"] {
+									isInTarEdge = true
+								}
+							}
+							if !isInTarEdge {
+								h.updateValue["state"] = append(h.updateValue["state"].([]map[string]interface{}), curWoState)
+							}
+						}
+					}
+				}
+
 				err = h.circulation()
 				if err != nil {
 					err = fmt.Errorf("工单跳转失败，%v", err.Error())
@@ -837,6 +916,11 @@ func (h *Handle) HandleWorkOrder(
 		Status:       flowProperties,
 		CostDuration: costDurationValue,
 		Remarks:      remarks,
+		IsEffect:     1,
+	}
+
+	if flowProperties == 0 {
+		cirHistoryData.IsEffect = 0
 	}
 
 	var woStateList []map[string]interface{}
@@ -1051,9 +1135,11 @@ func (h *Handle) SuspendWorkOrder(
 	if isSuspend {
 		targetState["is_suspend"] = true
 		targetState["suspend_time"] = time.Now().Format(constants.TimeFormat)
+		targetState["operator"] = tools.GetUserId(c)
 		delete(targetState, "resume_time")
 	} else {
 		targetState["is_suspend"] = false
+		targetState["operator"] = tools.GetUserId(c)
 		targetState["resume_time"] = time.Now().Format(constants.TimeFormat)
 	}
 
