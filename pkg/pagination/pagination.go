@@ -50,9 +50,9 @@ func Paging(p *Param, result interface{}, args ...interface{}) (*Paginator, erro
 
 	db := p.DB
 
-	if p.ShowSQL {
-		db = db.Debug()
-	}
+	//if p.ShowSQL {
+	db = db.Debug()
+	//}
 
 	if param.Page < 1 {
 		param.Page = 1

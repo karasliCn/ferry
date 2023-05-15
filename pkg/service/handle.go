@@ -13,6 +13,7 @@ import (
 	"ferry/tools"
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -372,7 +373,7 @@ continueHistoryTag:
 
 func (h *Handle) commonProcessing(c *gin.Context) (err error) {
 	// 如果是拒绝的流转则直接跳转
-	if h.flowProperties == 0 {
+	if h.flowProperties == constants.FlowProperties_Discard {
 		err = h.circulation()
 		if err != nil {
 			err = fmt.Errorf("工单跳转失败，%v", err.Error())
@@ -383,6 +384,7 @@ func (h *Handle) commonProcessing(c *gin.Context) (err error) {
 		err = orm.Eloquent.Model(&process.Info{}).Where(" id = ?", h.workOrderDetails.Process).Find(&processInfo).Error
 		if err != nil {
 			err = fmt.Errorf("工单跳转失败，%v", err.Error())
+			return err
 		}
 
 		toCheckNodes := []string{h.targetStateValue["id"].(string)}
@@ -392,7 +394,11 @@ func (h *Handle) commonProcessing(c *gin.Context) (err error) {
 		procEdges := procStruc["edges"].([]interface{})
 		for i := range procEdges {
 			edge := procEdges[i].(map[string]interface{})
-			if edge["flowProperties"] == "1" {
+			edgeFlowProps, err := strconv.Atoi(edge["flowProperties"].(string))
+			if err != nil {
+				return err
+			}
+			if edgeFlowProps == constants.FlowProperties_Agree {
 				source := edge["source"].(string)
 				targets, ok := edgeMap[source]
 				if !ok {
@@ -919,7 +925,7 @@ func (h *Handle) HandleWorkOrder(
 		IsEffect:     1,
 	}
 
-	if flowProperties == 0 {
+	if flowProperties == constants.FlowProperties_Discard {
 		cirHistoryData.IsEffect = 0
 	}
 

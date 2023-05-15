@@ -125,6 +125,41 @@ func (w *WorkOrder) buildQuery() (dbObj *gorm.DB, err error) {
 			Where("p_work_order_tpl_data.form_data->'$.*' LIKE CONCAT('%',?,'%')", formData).
 			Group("p_work_order_info.id")
 	}
+
+	// 获取当前用户信息
+	switch w.Classify {
+	case 1:
+		// 待办工单
+		// 1. 个人
+		personSelect := fmt.Sprintf(personSelectValue, tools.GetUserId(w.GinObj))
+
+		// 2. 角色
+		roleSelect := fmt.Sprintf(roleSelectValue, tools.GetRoleId(w.GinObj))
+
+		// 3. 部门
+		var userInfo system.SysUser
+		err := orm.Eloquent.Model(&system.SysUser{}).
+			Where("user_id = ?", tools.GetUserId(w.GinObj)).
+			Find(&userInfo).Error
+		if err != nil {
+			return nil, err
+		}
+		departmentSelect := fmt.Sprintf(departmentSelectValue, userInfo.DeptId)
+
+		// 4. 变量会转成个人数据
+		//db = db.Where(fmt.Sprintf("(%v or %v or %v or %v) and is_end = 0", personSelect, personGroupSelect, departmentSelect, variableSelect))
+		db = db.Where(fmt.Sprintf("(%v or %v or %v) and p_work_order_info.is_end = 0", personSelect, roleSelect, departmentSelect))
+	case 2:
+		// 我创建的
+		db = db.Where("p_work_order_info.creator = ?", tools.GetUserId(w.GinObj))
+	case 3:
+		// 我相关的
+		db = db.Where(fmt.Sprintf("JSON_CONTAINS(p_work_order_info.related_person, '%v')", tools.GetUserId(w.GinObj)))
+	case 4:
+	// 所有工单
+	default:
+		return nil, fmt.Errorf("请确认查询的数据类型是否正确")
+	}
 	if processor != "" && w.Classify != 1 {
 		err := orm.Eloquent.Model(&processorInfo).
 			Where("user_id = ?", processor).
