@@ -765,6 +765,15 @@ func (h *Handle) HandleWorkOrder(
 				}
 			} else {
 				h.endHistory = false
+				err = h.tx.Model(&process.WorkOrderInfo{}).
+					Where("id = ?", h.workOrderId).
+					Updates(map[string]interface{}{
+						"related_person": h.updateValue["related_person"],
+					}).Error
+				if err != nil {
+					h.tx.Rollback()
+					return
+				}
 			}
 
 		} else {
