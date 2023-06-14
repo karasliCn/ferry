@@ -42,6 +42,7 @@ type CirculationInfo struct {
 	ResumeTime     string `json:"resume_time"`
 	ProcessorIds   []int  `json:"processor_ids"`
 	ProcessorNames string `json:"processor_names"`
+	Remarks        string `json:"remarks"`
 }
 
 func NewWorkOrder(classify int, c *gin.Context) *WorkOrder {
@@ -322,6 +323,7 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 						Title:        woInfo.Title,
 						State:        s["label"].(string),
 						CreateTime:   woInfo.UpdatedAt.Format(constants.TimeFormat),
+						Remarks:      v.Remarks,
 					}
 					for _, processor := range s["processor"].([]interface{}) {
 						cirInfo.ProcessorIds = append(cirInfo.ProcessorIds, int(processor.(float64)))

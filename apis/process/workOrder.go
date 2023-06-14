@@ -679,7 +679,7 @@ func GenerateCirculationExcel(c *gin.Context, circulationList []service.Circulat
 	f.SetActiveSheet(index)
 	excelData := make([][]string, 0)
 
-	header := []string{"流程", "标题", "节点名称", "处理人", "创建时间", "完成时间", "挂起时间", "恢复时间"}
+	header := []string{"流程", "标题", "节点名称", "处理人", "创建时间", "完成时间", "挂起时间", "恢复时间", "备注"}
 	excelData = append(excelData, header)
 	for _, circulationInfo := range circulationList {
 		rowData := make([]string, 0)
@@ -691,6 +691,7 @@ func GenerateCirculationExcel(c *gin.Context, circulationList []service.Circulat
 		rowData = append(rowData, circulationInfo.EndTime)
 		rowData = append(rowData, circulationInfo.SuspendTime)
 		rowData = append(rowData, circulationInfo.ResumeTime)
+		rowData = append(rowData, circulationInfo.Remarks)
 		excelData = append(excelData, rowData)
 	}
 
