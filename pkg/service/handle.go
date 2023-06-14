@@ -765,9 +765,23 @@ func (h *Handle) HandleWorkOrder(
 				}
 			} else {
 				h.endHistory = false
+				var currentWoStateList []map[string]interface{}
+				err = json.Unmarshal(h.workOrderDetails.State, &currentWoStateList)
+				for _, curWoState := range currentWoStateList {
+					if curWoState["id"] == h.stateValue["id"] {
+						curWoState["processed"] = true
+						break
+					}
+				}
+				stateValue, err2 := json.Marshal(currentWoStateList)
+				if err2 != nil {
+					err2 = fmt.Errorf("工单处理失败，%v", err.Error())
+					return
+				}
 				err = h.tx.Model(&process.WorkOrderInfo{}).
 					Where("id = ?", h.workOrderId).
 					Updates(map[string]interface{}{
+						"state":          stateValue,
 						"related_person": h.updateValue["related_person"],
 					}).Error
 				if err != nil {

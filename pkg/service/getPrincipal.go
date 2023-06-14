@@ -53,7 +53,7 @@ func GetPrincipal(processor []int, processMethod string) (principals string, err
 			}
 		}
 	}
-	return strings.Join(principalList, ","), nil
+	return strings.Join(principalList, ", "), nil
 }
 
 // 获取用户对应

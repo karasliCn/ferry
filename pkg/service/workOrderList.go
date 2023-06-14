@@ -230,28 +230,31 @@ func (w *WorkOrder) WorkOrderList() (result interface{}, err error) {
 			}
 
 			processorList := make([]int, 0)
+			processorMap := make(map[int]bool)
 			if len(StateList) > 1 {
 				for _, s := range StateList {
-					for _, p := range s["processor"].([]interface{}) {
-						if int(p.(float64)) == tools.GetUserId(w.GinObj) {
-							processorList = append(processorList, int(p.(float64)))
+					if s["processed"] != true {
+						for _, p := range s["processor"].([]interface{}) {
+							processor := int(p.(float64))
+							_, ok := processorMap[processor]
+							if !ok {
+								processorList = append(processorList, int(p.(float64)))
+								processorMap[processor] = true
+							}
 						}
-					}
-					if len(processorList) > 0 {
-						stateName = s["label"].(string)
-						break
+						if len(processorList) > 0 {
+							if len(stateName) > 0 {
+								stateName = stateName + ", "
+							}
+							stateName = stateName + s["label"].(string)
+							//break
+						}
 					}
 				}
 			}
 			if len(processorList) == 0 {
 				for _, v := range StateList[0]["processor"].([]interface{}) {
-					// lhz updated
-					//if StateList[0]["process_method"] == "template" {
-					//
-					//} else {
 					processorList = append(processorList, int(v.(float64)))
-					//}
-
 				}
 				stateName = StateList[0]["label"].(string)
 			}
