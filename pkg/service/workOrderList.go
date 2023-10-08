@@ -213,7 +213,7 @@ func (w *WorkOrder) WorkOrderList() (result interface{}, err error) {
 			// 仅待办工单需要验证
 			// todo：还需要找最优解决方案
 			if w.Classify == 1 {
-				structResult, err = ProcessStructure(w.GinObj, v.Process, v.Id)
+				structResult, err = ProcessStructure(w.GinObj, v.Process, v.Id, "")
 				if err != nil {
 					return
 				}

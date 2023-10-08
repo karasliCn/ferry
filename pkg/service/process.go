@@ -21,7 +21,7 @@ type WorkOrderData struct {
 	CurrentState string `json:"current_state"`
 }
 
-func ProcessStructure(c *gin.Context, processId int, workOrderId int) (result map[string]interface{}, err error) {
+func ProcessStructure(c *gin.Context, processId int, workOrderId int, nodeId string) (result map[string]interface{}, err error) {
 	var (
 		processValue            process.Info
 		processStructureDetails map[string]interface{}
@@ -48,6 +48,7 @@ func ProcessStructure(c *gin.Context, processId int, workOrderId int) (result ma
 
 		// 排序，使用冒泡
 		p := processStructureDetails["nodes"].([]interface{})
+
 		if len(p) > 1 {
 			for i := 0; i < len(p); i++ {
 				for j := 1; j < len(p)-i; j++ {
@@ -149,8 +150,15 @@ func ProcessStructure(c *gin.Context, processId int, workOrderId int) (result ma
 							if _, ok := stateValue["processor"]; ok {
 								for _, userId := range stateValue["processor"].([]interface{}) {
 									if int(userId.(float64)) == tools.GetUserId(c) {
-										workOrderInfo.CurrentState = stateValue["id"].(string)
-										break breakStateTag
+										if len(nodeId) == 0 {
+											workOrderInfo.CurrentState = stateValue["id"].(string)
+											break breakStateTag
+										} else {
+											if nodeId == stateValue["id"].(string) {
+												workOrderInfo.CurrentState = stateValue["id"].(string)
+												break breakStateTag
+											}
+										}
 									}
 								}
 							} else {

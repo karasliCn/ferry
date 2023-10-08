@@ -37,7 +37,8 @@ func ProcessStructure(c *gin.Context) {
 	}
 	workOrderIdInt, _ := strconv.Atoi(workOrderId)
 	processIdInt, _ := strconv.Atoi(processId)
-	result, err := service.ProcessStructure(c, processIdInt, workOrderIdInt)
+	nodeId := c.DefaultQuery("nodeId", "")
+	result, err := service.ProcessStructure(c, processIdInt, workOrderIdInt, nodeId)
 	if err != nil {
 		app.Error(c, -1, err, "")
 		return
