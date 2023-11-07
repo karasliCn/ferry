@@ -23,7 +23,7 @@ func InitSysRouter(r *gin.Engine, authMiddleware *jwtauth.GinJWTMiddleware) *gin
 	sysStaticFileRouter(g, r)
 
 	// swagger；注意：生产环境可以注释掉
-	//sysSwaggerRouter(g)
+	sysSwaggerRouter(g)
 
 	// 无需认证
 	systemRouter.SysNoCheckRoleRouter(g)

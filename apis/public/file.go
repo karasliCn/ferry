@@ -86,6 +86,11 @@ func UploadFile(c *gin.Context) {
 			app.Error(c, 200, errors.New(""), "图片不能为空")
 			return
 		}
+		err = validateFileName(files.Filename)
+		if err != nil {
+			app.Error(c, 500, err, err.Error())
+			return
+		}
 		// 上传文件至指定目录
 		singleFile := saveFilePath + guid + "-" + files.Filename
 		_ = c.SaveUploadedFile(files, singleFile)
@@ -95,6 +100,14 @@ func UploadFile(c *gin.Context) {
 		files := c.Request.MultipartForm.File["file"]
 		multipartFile := make([]string, len(files))
 		for _, f := range files {
+			err = validateFileName(f.Filename)
+			if err != nil {
+				app.Error(c, 500, err, err.Error())
+				return
+			}
+		}
+		for _, f := range files {
+
 			guid = strings.ReplaceAll(uuid.New().String(), "-", "")
 			multipartFileName := saveFilePath + guid + "-" + f.Filename
 			_ = c.SaveUploadedFile(f, multipartFileName)
@@ -111,4 +124,16 @@ func UploadFile(c *gin.Context) {
 		app.Error(c, 200, errors.New(""), "标识不正确")
 		return
 	}
+}
+
+func validateFileName(fileName string) error {
+	var allowMimeTypes = viper.GetStringSlice("settings.upload.allowMimeType")
+	var parts = strings.Split(fileName, ".")
+	var extension = parts[len(parts)-1]
+	for _, allowMimeType := range allowMimeTypes {
+		if extension == allowMimeType {
+			return nil
+		}
+	}
+	return errors.New(fileName + "不支持的文件类型")
 }

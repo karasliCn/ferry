@@ -284,6 +284,9 @@ func (mw *GinJWTMiddleware) MiddlewareInit() error {
 		mw.Timeout = time.Duration(config2.JwtConfig.Timeout) * time.Second
 	}
 
+	if config2.JwtConfig.Secret != "" {
+		mw.Key = []byte(config2.JwtConfig.Secret)
+	}
 	if mw.TimeFunc == nil {
 		mw.TimeFunc = time.Now
 	}
