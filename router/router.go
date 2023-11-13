@@ -6,6 +6,7 @@ import (
 	"ferry/router/dashboard"
 	"ferry/router/process"
 	systemRouter "ferry/router/system"
+	"github.com/spf13/viper"
 
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
@@ -23,7 +24,10 @@ func InitSysRouter(r *gin.Engine, authMiddleware *jwtauth.GinJWTMiddleware) *gin
 	sysStaticFileRouter(g, r)
 
 	// swagger；注意：生产环境可以注释掉
-	sysSwaggerRouter(g)
+	env := viper.GetString("settings.env")
+	if env == "dev" {
+		sysSwaggerRouter(g)
+	}
 
 	// 无需认证
 	systemRouter.SysNoCheckRoleRouter(g)

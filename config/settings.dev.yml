@@ -26,6 +26,7 @@ settings:
     pass: K@ras147
     port: 25
     user: lihanzhao@gacfinance.com.cn
+  env: dev
   gorm:
     logmode: 0
     maxidleconn: 0

@@ -2,7 +2,6 @@ package worker
 
 import (
 	"context"
-	"errors"
 	"ferry/pkg/logger"
 	"os/exec"
 	"syscall"
@@ -27,7 +26,7 @@ func executeTaskBase(scriptPath string, params string) (err error) {
 
 // ExecCommand 异步任务
 func ExecCommand(classify string, scriptPath string, params string) (err error) {
-	if classify == "shell" {
+	/*if classify == "shell" {
 		logger.Info("start exec shell - ", scriptPath)
 		err = executeTaskBase(scriptPath, params)
 		if err != nil {
@@ -42,7 +41,7 @@ func ExecCommand(classify string, scriptPath string, params string) (err error) 
 	} else {
 		err = errors.New("目前仅支持Python与Shell脚本的执行，请知悉。")
 		return
-	}
+	}*/
 	return
 }
 

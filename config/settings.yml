@@ -14,9 +14,9 @@ settings:
     dbtype: mysql
     host: localhost
     name: ferry
-    password: 123456
+    password: ferry
     port: 3306
-    username: root
+    username: ferry
   domain:
     gethost: 1
     url: localhost:9527
@@ -26,6 +26,7 @@ settings:
     pass: K@ras147
     port: 25
     user: lihanzhao@gacfinance.com.cn
+  env: prod
   gorm:
     logmode: 0
     maxidleconn: 0
@@ -60,16 +61,16 @@ settings:
     key: keystring
     pem: temp/pem.pem
   upload:
-    allowMimeType:
-      - jpg
-      - jpeg
-      - png
-      - bmp
-      - txt
-      - xls
-      - xlsx
-      - ppt
-      - pptx
-      - doc
-      - docx
-      - rft
+    allowmimetype:
+    - jpg
+    - jpeg
+    - png
+    - bmp
+    - txt
+    - xls
+    - xlsx
+    - ppt
+    - pptx
+    - doc
+    - docx
+    - rft
