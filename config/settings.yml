@@ -5,7 +5,7 @@ settings:
     domain: localhost:8002
     host: 0.0.0.0
     ishttps: false
-    mode: dev
+    mode: prod
     name: ferry
     port: "8002"
     readtimeout: 1

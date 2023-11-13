@@ -24,7 +24,7 @@ func InitSysRouter(r *gin.Engine, authMiddleware *jwtauth.GinJWTMiddleware) *gin
 	sysStaticFileRouter(g, r)
 
 	// swagger；注意：生产环境可以注释掉
-	env := viper.GetString("settings.env")
+	env := viper.GetString("settings.application.mode")
 	if env == "dev" {
 		sysSwaggerRouter(g)
 	}
