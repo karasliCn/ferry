@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
+	"strconv"
 )
 
 /*
@@ -21,6 +22,11 @@ import (
 type WorkOrder struct {
 	Classify int
 	GinObj   *gin.Context
+}
+
+type Processor struct {
+	ProcessorId   int
+	ProcessorType string
 }
 
 type workOrderInfo struct {
@@ -200,9 +206,9 @@ func (w *WorkOrder) WorkOrderList() (result interface{}, err error) {
 
 	for i, v := range *result.(*pagination.Paginator).Data.(*[]workOrderInfo) {
 		var (
-			stateName    string
-			structResult map[string]interface{}
-			authStatus   bool
+			stateName string
+			//structResult map[string]interface{}
+			authStatus bool
 		)
 		err = json.Unmarshal(v.State, &StateList)
 		if err != nil {
@@ -213,12 +219,12 @@ func (w *WorkOrder) WorkOrderList() (result interface{}, err error) {
 			// 仅待办工单需要验证
 			// todo：还需要找最优解决方案
 			if w.Classify == 1 {
-				structResult, err = ProcessStructure(w.GinObj, v.Process, v.Id, "")
-				if err != nil {
-					return
-				}
+				//structResult, err = ProcessStructure(w.GinObj, v.Process, v.Id, "")
+				//if err != nil {
+				//	return
+				//}
 
-				authStatus, err = JudgeUserAuthority(w.GinObj, v.Id, structResult["workOrder"].(WorkOrderData).CurrentState)
+				authStatus, err = JudgeUserAuthorityWithStateList(w.GinObj, v.Id)
 				if err != nil {
 					return
 				}
@@ -230,20 +236,22 @@ func (w *WorkOrder) WorkOrderList() (result interface{}, err error) {
 				authStatus = true
 			}
 
-			processorList := make([]int, 0)
-			processorMap := make(map[int]bool)
+			processorListByMethod := make(map[string][]int, 0)
+			processorMap := make(map[string]bool)
 			if len(StateList) > 1 {
 				for _, s := range StateList {
 					if s["processed"] != true {
 						for _, p := range s["processor"].([]interface{}) {
-							processor := int(p.(float64))
-							_, ok := processorMap[processor]
+							pMethod := (s["process_method"]).(string)
+							processorId := int(p.(float64))
+							key := pMethod + strconv.Itoa(processorId)
+							_, ok := processorMap[key]
 							if !ok {
-								processorList = append(processorList, int(p.(float64)))
-								processorMap[processor] = true
+								processorListByMethod[pMethod] = append(processorListByMethod[pMethod], processorId)
+								processorMap[key] = true
 							}
 						}
-						if len(processorList) > 0 {
+						if len(processorListByMethod) > 0 {
 							if len(stateName) > 0 {
 								stateName = stateName + ", "
 							}
@@ -253,13 +261,15 @@ func (w *WorkOrder) WorkOrderList() (result interface{}, err error) {
 					}
 				}
 			}
-			if len(processorList) == 0 {
+			if len(processorListByMethod) == 0 {
+				processIdList := make([]int, 0)
 				for _, v := range StateList[0]["processor"].([]interface{}) {
-					processorList = append(processorList, int(v.(float64)))
+					processIdList = append(processIdList, int(v.(float64)))
 				}
+				processorListByMethod[StateList[0]["processor"].(string)] = processIdList
 				stateName = StateList[0]["label"].(string)
 			}
-			principals, err = GetPrincipal(processorList, StateList[0]["process_method"].(string))
+			principals, err = GetPrincipal(processorListByMethod, StateList[0]["process_method"].(string))
 			if err != nil {
 				err = fmt.Errorf("查询处理人名称失败，%v", err.Error())
 				return

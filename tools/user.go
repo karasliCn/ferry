@@ -62,3 +62,13 @@ func GetRoleId(c *gin.Context) int {
 	fmt.Println("********** 路径：" + c.Request.URL.Path + "  请求方法：" + c.Request.Method + "  缺少roleid")
 	return 0
 }
+
+func GetDeptId(c *gin.Context) int {
+	data := ExtractClaims(c)
+	if data["deptid"] != nil {
+		i := int((data["deptid"]).(float64))
+		return i
+	}
+	fmt.Println("********** 路径：" + c.Request.URL.Path + "  请求方法：" + c.Request.Method + "  缺少deptid")
+	return 0
+}

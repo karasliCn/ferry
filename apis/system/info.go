@@ -15,6 +15,7 @@ import (
 func GetInfo(c *gin.Context) {
 
 	var roles = make([]string, 1)
+	var roleIds = make([]int, 1)
 	roles[0] = tools.GetRoleName(c)
 
 	var permissions = make([]string, 1)
@@ -24,10 +25,13 @@ func GetInfo(c *gin.Context) {
 	buttons[0] = "*:*:*"
 
 	RoleMenu := system.RoleMenu{}
-	RoleMenu.RoleId = tools.GetRoleId(c)
+	roleId := tools.GetRoleId(c)
+	roleIds[0] = roleId
+	RoleMenu.RoleId = roleId
 
 	var mp = make(map[string]interface{})
 	mp["roles"] = roles
+	mp["roleIds"] = roleIds
 	if tools.GetRoleName(c) == "admin" || tools.GetRoleName(c) == "系统管理员" {
 		mp["permissions"] = permissions
 		mp["buttons"] = buttons

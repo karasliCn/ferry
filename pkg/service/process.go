@@ -21,6 +21,19 @@ type WorkOrderData struct {
 	CurrentState string `json:"current_state"`
 }
 
+func checkProcessorAndProcessMethod(c *gin.Context, processorId int, processorMethod string) (canAccess bool) {
+	var targetId int
+	switch processorMethod {
+	case "person":
+		targetId = tools.GetUserId(c)
+	case "role":
+		targetId = tools.GetRoleId(c)
+	case "department":
+		targetId = tools.GetDeptId(c)
+	}
+	return processorId == targetId
+}
+
 func ProcessStructure(c *gin.Context, processId int, workOrderId int, nodeId string) (result map[string]interface{}, err error) {
 	var (
 		processValue            process.Info
@@ -149,7 +162,8 @@ func ProcessStructure(c *gin.Context, processId int, workOrderId int, nodeId str
 						if stateValue["id"].(string) == processNodeValue.(map[string]interface{})["id"] {
 							if _, ok := stateValue["processor"]; ok {
 								for _, userId := range stateValue["processor"].([]interface{}) {
-									if int(userId.(float64)) == tools.GetUserId(c) {
+									if checkProcessorAndProcessMethod(c, int(userId.(float64)), stateValue["process_method"].(string)) {
+										//if int(userId.(float64)) == tools.GetUserId(c) {
 										if len(nodeId) == 0 {
 											workOrderInfo.CurrentState = stateValue["id"].(string)
 											break breakStateTag

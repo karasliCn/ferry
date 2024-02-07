@@ -32,6 +32,7 @@ func PayloadFunc(data interface{}) jwt.MapClaims {
 			jwt.RoleKey:     r.RoleKey,
 			jwt.NiceKey:     u.Username,
 			jwt.RoleNameKey: r.RoleName,
+			jwt.DeptIdKey:   u.DeptId,
 		}
 	}
 	return jwt.MapClaims{}

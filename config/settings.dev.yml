@@ -13,10 +13,10 @@ settings:
   database:
     dbtype: mysql
     host: 127.0.0.1
-    name: ferry
-    password: ferry
+    name: ferry_prod
+    password: K@ras147
     port: 3306
-    username: ferry
+    username: root
   domain:
     gethost: 1
     url: localhost:9527

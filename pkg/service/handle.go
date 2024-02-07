@@ -1181,3 +1181,15 @@ func (h *Handle) SuspendWorkOrder(
 	h.tx.Commit() // 提交事务
 	return
 }
+
+func getProcessedHistoryString(c *gin.Context, method string) (processedHistoryString string) {
+	switch method {
+	case "person":
+		return method + strconv.Itoa(tools.GetUserId(c))
+	case "role":
+		return method + strconv.Itoa(tools.GetRoleId(c))
+	case "department":
+		return method + strconv.Itoa(tools.GetDeptId(c))
+	}
+	return ""
+}
