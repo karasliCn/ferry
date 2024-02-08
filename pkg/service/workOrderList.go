@@ -41,6 +41,7 @@ type CirculationInfo struct {
 	ProcessName    string `json:"process_name"`
 	Title          string `json:"title"`
 	State          string `json:"state"`
+	ProcessMethod  string `json:"process_method"`
 	Processor      string `json:"processor"`
 	CreateTime     string `json:"create_time"`
 	EndTime        string `json:"update_time"`
@@ -194,7 +195,7 @@ func (w *WorkOrder) WorkOrderList() (result interface{}, err error) {
 
 	var (
 		principals        string
-		StateList         []map[string]interface{}
+		stateList         []map[string]interface{}
 		workOrderInfoList []workOrderInfo
 		minusTotal        int
 	)
@@ -210,12 +211,12 @@ func (w *WorkOrder) WorkOrderList() (result interface{}, err error) {
 			//structResult map[string]interface{}
 			authStatus bool
 		)
-		err = json.Unmarshal(v.State, &StateList)
+		err = json.Unmarshal(v.State, &stateList)
 		if err != nil {
 			err = fmt.Errorf("json反序列化失败，%v", err.Error())
 			return
 		}
-		if len(StateList) != 0 {
+		if len(stateList) != 0 {
 			// 仅待办工单需要验证
 			// todo：还需要找最优解决方案
 			if w.Classify == 1 {
@@ -238,8 +239,8 @@ func (w *WorkOrder) WorkOrderList() (result interface{}, err error) {
 
 			processorListByMethod := make(map[string][]int, 0)
 			processorMap := make(map[string]bool)
-			if len(StateList) > 1 {
-				for _, s := range StateList {
+			if len(stateList) > 1 {
+				for _, s := range stateList {
 					if s["processed"] != true {
 						for _, p := range s["processor"].([]interface{}) {
 							pMethod := (s["process_method"]).(string)
@@ -263,13 +264,13 @@ func (w *WorkOrder) WorkOrderList() (result interface{}, err error) {
 			}
 			if len(processorListByMethod) == 0 {
 				processIdList := make([]int, 0)
-				for _, v := range StateList[0]["processor"].([]interface{}) {
+				for _, v := range stateList[0]["processor"].([]interface{}) {
 					processIdList = append(processIdList, int(v.(float64)))
 				}
-				processorListByMethod[StateList[0]["processor"].(string)] = processIdList
-				stateName = StateList[0]["label"].(string)
+				processorListByMethod[stateList[0]["process_method"].(string)] = processIdList
+				stateName = stateList[0]["label"].(string)
 			}
-			principals, err = GetPrincipal(processorListByMethod, StateList[0]["process_method"].(string))
+			principals, err = GetPrincipal(processorListByMethod, stateList[0]["process_method"].(string))
 			if err != nil {
 				err = fmt.Errorf("查询处理人名称失败，%v", err.Error())
 				return
@@ -315,9 +316,10 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 		return
 	}
 
-	userIdList := make([]int, 0)
+	//userIdList := make([]int, 0)
 	var currentWorkOrderId int
 	var lastEndTime string
+	needQueryMap := make(map[string][]int)
 	for _, v := range circulationList {
 		woInfo, ok := workOrderInfoMap[v.WorkOrder]
 		if ok {
@@ -327,18 +329,27 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 				state := make([]map[string]interface{}, 0)
 				json.Unmarshal(woInfo.State, &state)
 				for _, s := range state {
+					if s["processed"] == true {
+						continue
+					}
+					if needQueryMap[s["process_method"].(string)] == nil {
+						needQueryMap[s["process_method"].(string)] = make([]int, 0)
+					}
+
 					cirInfo := CirculationInfo{
-						ProcessName:  woInfo.ProcessName,
-						ProcessorIds: []int{},
-						Title:        woInfo.Title,
-						State:        s["label"].(string),
-						CreateTime:   woInfo.UpdatedAt.Format(constants.TimeFormat),
-						Remarks:      v.Remarks,
+						ProcessName:   woInfo.ProcessName,
+						ProcessorIds:  []int{},
+						ProcessMethod: s["process_method"].(string),
+						Title:         woInfo.Title,
+						State:         s["label"].(string),
+						CreateTime:    woInfo.UpdatedAt.Format(constants.TimeFormat),
+						Remarks:       v.Remarks,
 					}
 					for _, processor := range s["processor"].([]interface{}) {
 						cirInfo.ProcessorIds = append(cirInfo.ProcessorIds, int(processor.(float64)))
+						needQueryMap[s["process_method"].(string)] = append(needQueryMap[s["process_method"].(string)], int(processor.(float64)))
 					}
-					userIdList = append(userIdList, cirInfo.ProcessorIds...)
+					//userIdList = append(userIdList, cirInfo.ProcessorIds...)
 					susTime, sok := s["suspend_time"].(string)
 					if sok {
 						cirInfo.SuspendTime = susTime
@@ -356,6 +367,7 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 				Title:          woInfo.Title,
 				State:          v.State,
 				Processor:      v.Processor,
+				ProcessMethod:  "person",
 				EndTime:        v.CreatedAt.Format(constants.TimeFormat),
 				ProcessorNames: v.Processor,
 			}
@@ -376,21 +388,49 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 	}
 
 	var userInfoList []system.SysUser
-	err = orm.Eloquent.Model(&system.SysUser{}).Where(" user_id IN (?)", userIdList).Find(&userInfoList).Error
+	var userInfoMap = make(map[int]system.SysUser)
+
+	var roleInfoList []system.SysRole
+	var roleInfoMap = make(map[int]system.SysRole)
+
+	if len(needQueryMap) > 0 {
+		userIdList, ok := needQueryMap["person"]
+		if ok && len(userIdList) > 0 {
+			err = orm.Eloquent.Model(&system.SysUser{}).Where(" user_id IN (?)", userIdList).Find(&userInfoList).Error
+			for _, userInfo := range userInfoList {
+				userInfoMap[userInfo.UserId] = userInfo
+			}
+		}
+		roleIdList, ok := needQueryMap["role"]
+		if ok && len(roleIdList) > 0 {
+			err = orm.Eloquent.Model(&system.SysRole{}).Where(" role_id IN (?)", roleIdList).Find(&roleInfoList).Error
+			for _, roleInfo := range roleInfoList {
+				roleInfoMap[roleInfo.RoleId] = roleInfo
+			}
+		}
+	}
+
 	if err != nil {
 		return
 	}
-	var userInfoMap = make(map[int]system.SysUser)
-	for _, userInfo := range userInfoList {
-		userInfoMap[userInfo.UserId] = userInfo
-	}
+
 	for idx, cirInfo := range cirRes {
 		if len(cirInfo.ProcessorIds) > 0 {
-			for i, userId := range cirInfo.ProcessorIds {
-				if i > 0 {
-					cirRes[idx].ProcessorNames = cirInfo.ProcessorNames + ", "
+			if cirInfo.ProcessMethod == "person" {
+				for i, userId := range cirInfo.ProcessorIds {
+					if i > 0 {
+						cirRes[idx].ProcessorNames = cirInfo.ProcessorNames + ", "
+					}
+					cirRes[idx].ProcessorNames = cirInfo.ProcessorNames + userInfoMap[userId].NickName
 				}
-				cirRes[idx].ProcessorNames = cirInfo.ProcessorNames + userInfoMap[userId].NickName
+			}
+			if cirInfo.ProcessMethod == "role" {
+				for i, roleId := range cirInfo.ProcessorIds {
+					if i > 0 {
+						cirRes[idx].ProcessorNames = cirInfo.ProcessorNames + ", "
+					}
+					cirRes[idx].ProcessorNames = cirInfo.ProcessorNames + roleInfoMap[roleId].RoleName
+				}
 			}
 		}
 	}

@@ -202,9 +202,9 @@ func JudgeUserAuthorityWithStateList(c *gin.Context, workOrderId int) (status bo
 		variable 变量
 	*/
 	var (
-		userDept         system.Dept
-		workOrderInfo    process.WorkOrderInfo
-		userInfo         system.SysUser
+		userDept      system.Dept
+		workOrderInfo process.WorkOrderInfo
+		//userInfo         system.SysUser
 		cirHistoryList   []process.CirculationHistory
 		stateValue       map[string]interface{}
 		processInfo      process.Info
@@ -254,25 +254,28 @@ func JudgeUserAuthorityWithStateList(c *gin.Context, workOrderId int) (status bo
 	if err != nil {
 		return
 	}
-	for _, currentStateValue := range currentStateList {
+	for _, currentState := range currentStateList {
 		// 会签
-		stateValue, err = processState.GetNode(currentStateValue["id"].(string))
+		stateValue, err = processState.GetNode(currentState["id"].(string))
 		if err != nil {
 			return
 		}
-		if currentStateValue["processed"] != true && currentStateValue["processor"] != nil && len(currentStateValue["processor"].([]interface{})) >= 1 {
+		if currentState["processed"] == true {
+			continue
+		}
+		if currentState["processor"] != nil && len(currentState["processor"].([]interface{})) >= 1 {
 			if isCounterSign, ok := stateValue["isCounterSign"]; ok {
 				if isCounterSign.(bool) {
 					for _, cirHistoryValue := range cirHistoryList {
 						if cirHistoryValue.Source != stateValue["id"] {
 							break
 						} else if cirHistoryValue.Source == stateValue["id"] {
-							if currentStateValue["process_method"].(string) == "person" {
+							if currentState["process_method"].(string) == "person" {
 								// 验证个人会签
 								if cirHistoryValue.ProcessorId == tools.GetUserId(c) {
 									return
 								}
-							} else if currentStateValue["process_method"].(string) == "role" {
+							} else if currentState["process_method"].(string) == "role" {
 								// 验证角色会签
 								if stateValue["fullHandle"].(bool) {
 									if cirHistoryValue.ProcessorId == tools.GetUserId(c) {
@@ -291,7 +294,7 @@ func JudgeUserAuthorityWithStateList(c *gin.Context, workOrderId int) (status bo
 										return
 									}
 								}
-							} else if currentStateValue["process_method"].(string) == "department" {
+							} else if currentState["process_method"].(string) == "department" {
 								// 部门会签
 								if stateValue["fullHandle"].(bool) {
 									if cirHistoryValue.ProcessorId == tools.GetUserId(c) {
@@ -320,44 +323,44 @@ func JudgeUserAuthorityWithStateList(c *gin.Context, workOrderId int) (status bo
 			}
 		}
 
-		switch currentStateValue["process_method"].(string) {
+		switch currentState["process_method"].(string) {
 		case "person":
-			for _, processorValue := range currentStateValue["processor"].([]interface{}) {
+			for _, processorValue := range currentState["processor"].([]interface{}) {
 				if int(processorValue.(float64)) == tools.GetUserId(c) {
-					return currentStateValue["processed"] != true, nil
+					return true, nil
 				}
 			}
 		case "role":
-			for _, processorValue := range currentStateValue["processor"].([]interface{}) {
+			for _, processorValue := range currentState["processor"].([]interface{}) {
 				if int(processorValue.(float64)) == tools.GetRoleId(c) {
-					return currentStateValue["processed"] != true, nil
+					return true, nil
 				}
 			}
 		case "department":
-			for _, processorValue := range currentStateValue["processor"].([]interface{}) {
+			for _, processorValue := range currentState["processor"].([]interface{}) {
 				if int(processorValue.(float64)) == currentUserInfo.DeptId {
-					return currentStateValue["processed"] != true, nil
+					return true, nil
 				}
 			}
 		case "variable":
-			for _, p := range currentStateValue["processor"].([]interface{}) {
+			for _, p := range currentState["processor"].([]interface{}) {
 				switch int(p.(float64)) {
 				case 1:
 					if workOrderInfo.Creator == tools.GetUserId(c) {
-						return currentStateValue["processed"] != true, nil
+						return true, nil
 					}
 				case 2:
-					err = orm.Eloquent.Model(&userInfo).Where("user_id = ?", workOrderInfo.Creator).Find(&userInfo).Error
-					if err != nil {
-						return false, nil
-					}
-					err = orm.Eloquent.Model(&userDept).Where("dept_id = ?", userInfo.DeptId).Find(&userDept).Error
-					if err != nil {
-						return false, nil
-					}
+					//err = orm.Eloquent.Model(&userInfo).Where("user_id = ?", workOrderInfo.Creator).Find(&userInfo).Error
+					//if err != nil {
+					//	return false, nil
+					//}
+					//err = orm.Eloquent.Model(&userDept).Where("dept_id = ?", userInfo.DeptId).Find(&userDept).Error
+					//if err != nil {
+					//	return false, nil
+					//}
 
 					if userDept.Leader == tools.GetUserId(c) {
-						return currentStateValue["processed"] != true, nil
+						return true, nil
 					}
 				}
 			}
