@@ -393,6 +393,9 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 	var roleInfoList []system.SysRole
 	var roleInfoMap = make(map[int]system.SysRole)
 
+	var deptInfoList []system.Dept
+	var deptInfoMap = make(map[int]system.Dept)
+
 	if len(needQueryMap) > 0 {
 		userIdList, ok := needQueryMap["person"]
 		if ok && len(userIdList) > 0 {
@@ -406,6 +409,13 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 			err = orm.Eloquent.Model(&system.SysRole{}).Where(" role_id IN (?)", roleIdList).Find(&roleInfoList).Error
 			for _, roleInfo := range roleInfoList {
 				roleInfoMap[roleInfo.RoleId] = roleInfo
+			}
+		}
+		deptIdList, ok := needQueryMap["department"]
+		if ok && len(deptIdList) > 0 {
+			err = orm.Eloquent.Model(&system.SysRole{}).Where(" role_id IN (?)", deptIdList).Find(&deptInfoList).Error
+			for _, deptInfo := range deptInfoList {
+				deptInfoMap[deptInfo.DeptId] = deptInfo
 			}
 		}
 	}
@@ -430,6 +440,14 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 						cirRes[idx].ProcessorNames = cirInfo.ProcessorNames + ", "
 					}
 					cirRes[idx].ProcessorNames = cirInfo.ProcessorNames + roleInfoMap[roleId].RoleName
+				}
+			}
+			if cirInfo.ProcessMethod == "department" {
+				for i, deptId := range cirInfo.ProcessorIds {
+					if i > 0 {
+						cirRes[idx].ProcessorNames = cirInfo.ProcessorNames + ", "
+					}
+					cirRes[idx].ProcessorNames = cirInfo.ProcessorNames + deptInfoMap[deptId].DeptName
 				}
 			}
 		}
