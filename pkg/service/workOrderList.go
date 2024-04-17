@@ -50,6 +50,19 @@ type CirculationInfo struct {
 	ProcessorIds   []int  `json:"processor_ids"`
 	ProcessorNames string `json:"processor_names"`
 	Remarks        string `json:"remarks"`
+	Action         string `json:"action"`
+	Creator        int    `json:"creator"`
+	CreatorName    string `json:"creator_name"`
+}
+
+type ProcessEdges struct {
+	Edges []Edge `json:"edges"`
+}
+
+type Edge struct {
+	Source string `json:"source"`
+	Target string `json:"target"`
+	Label  string `json:"label"`
 }
 
 func NewWorkOrder(classify int, c *gin.Context) *WorkOrder {
@@ -238,19 +251,17 @@ func (w *WorkOrder) WorkOrderList() (result interface{}, err error) {
 			}
 
 			processorListByMethod := make(map[string][]int, 0)
-			processorMap := make(map[string]bool)
+			allProcessorList := make([]string, 0)
 			if len(stateList) > 1 {
 				for _, s := range stateList {
 					if s["processed"] != true {
 						for _, p := range s["processor"].([]interface{}) {
 							pMethod := (s["process_method"]).(string)
 							processorId := int(p.(float64))
-							key := pMethod + strconv.Itoa(processorId)
-							_, ok := processorMap[key]
-							if !ok {
-								processorListByMethod[pMethod] = append(processorListByMethod[pMethod], processorId)
-								processorMap[key] = true
-							}
+
+							processorListByMethod[pMethod] = append(processorListByMethod[pMethod], processorId)
+							methodProcessor := pMethod + ":" + strconv.Itoa(processorId)
+							allProcessorList = append(allProcessorList, methodProcessor)
 						}
 						if len(processorListByMethod) > 0 {
 							if len(stateName) > 0 {
@@ -270,7 +281,7 @@ func (w *WorkOrder) WorkOrderList() (result interface{}, err error) {
 				processorListByMethod[stateList[0]["process_method"].(string)] = processIdList
 				stateName = stateList[0]["label"].(string)
 			}
-			principals, err = GetPrincipal(processorListByMethod, stateList[0]["process_method"].(string))
+			principals, err = GetPrincipal(processorListByMethod, allProcessorList)
 			if err != nil {
 				err = fmt.Errorf("查询处理人名称失败，%v", err.Error())
 				return
@@ -306,9 +317,13 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 	workOrderIdList := make([]int64, 0)
 	workOrderInfoMap := make(map[int]workOrderInfo)
 
+	needQueryMap := make(map[string][]int)
+	needQueryMap["person"] = make([]int, 0)
+
 	for _, v := range allWorkOder.([]workOrderInfo) {
 		workOrderIdList = append(workOrderIdList, int64(v.Id))
 		workOrderInfoMap[v.Id] = v
+		needQueryMap["person"] = append(needQueryMap["person"], v.Creator)
 	}
 
 	err = orm.Eloquent.Model(&process.CirculationHistory{}).Where(" work_order IN (?)", workOrderIdList).Order("work_order DESC, id DESC").Find(&circulationList).Error
@@ -316,10 +331,9 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 		return
 	}
 
-	//userIdList := make([]int, 0)
 	var currentWorkOrderId int
 	var lastEndTime string
-	needQueryMap := make(map[string][]int)
+
 	for _, v := range circulationList {
 		woInfo, ok := workOrderInfoMap[v.WorkOrder]
 		if ok {
@@ -327,7 +341,7 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 				currentWorkOrderId = v.WorkOrder
 				lastEndTime = ""
 				state := make([]map[string]interface{}, 0)
-				json.Unmarshal(woInfo.State, &state)
+				_ = json.Unmarshal(woInfo.State, &state)
 				for _, s := range state {
 					if s["processed"] == true {
 						continue
@@ -343,8 +357,9 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 						Title:         woInfo.Title,
 						State:         s["label"].(string),
 						CreateTime:    woInfo.UpdatedAt.Format(constants.TimeFormat),
-						Remarks:       v.Remarks,
+						Creator:       woInfo.Creator,
 					}
+
 					for _, processor := range s["processor"].([]interface{}) {
 						cirInfo.ProcessorIds = append(cirInfo.ProcessorIds, int(processor.(float64)))
 						needQueryMap[s["process_method"].(string)] = append(needQueryMap[s["process_method"].(string)], int(processor.(float64)))
@@ -370,7 +385,11 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 				ProcessMethod:  "person",
 				EndTime:        v.CreatedAt.Format(constants.TimeFormat),
 				ProcessorNames: v.Processor,
+				Remarks:        v.Remarks,
+				Action:         v.Circulation,
+				Creator:        woInfo.Creator,
 			}
+
 			if lastEndTime == "" {
 				cirInfo.CreateTime = woInfo.CreatedAt.Format(constants.TimeFormat)
 			} else {
@@ -396,27 +415,25 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 	var deptInfoList []system.Dept
 	var deptInfoMap = make(map[int]system.Dept)
 
-	if len(needQueryMap) > 0 {
-		userIdList, ok := needQueryMap["person"]
-		if ok && len(userIdList) > 0 {
-			err = orm.Eloquent.Model(&system.SysUser{}).Where(" user_id IN (?)", userIdList).Find(&userInfoList).Error
-			for _, userInfo := range userInfoList {
-				userInfoMap[userInfo.UserId] = userInfo
-			}
+	userIdList, ok := needQueryMap["person"]
+	if ok && len(userIdList) > 0 {
+		err = orm.Eloquent.Model(&system.SysUser{}).Where(" user_id IN (?)", userIdList).Find(&userInfoList).Error
+		for _, userInfo := range userInfoList {
+			userInfoMap[userInfo.UserId] = userInfo
 		}
-		roleIdList, ok := needQueryMap["role"]
-		if ok && len(roleIdList) > 0 {
-			err = orm.Eloquent.Model(&system.SysRole{}).Where(" role_id IN (?)", roleIdList).Find(&roleInfoList).Error
-			for _, roleInfo := range roleInfoList {
-				roleInfoMap[roleInfo.RoleId] = roleInfo
-			}
+	}
+	roleIdList, ok := needQueryMap["role"]
+	if ok && len(roleIdList) > 0 {
+		err = orm.Eloquent.Model(&system.SysRole{}).Where(" role_id IN (?)", roleIdList).Find(&roleInfoList).Error
+		for _, roleInfo := range roleInfoList {
+			roleInfoMap[roleInfo.RoleId] = roleInfo
 		}
-		deptIdList, ok := needQueryMap["department"]
-		if ok && len(deptIdList) > 0 {
-			err = orm.Eloquent.Model(&system.SysRole{}).Where(" role_id IN (?)", deptIdList).Find(&deptInfoList).Error
-			for _, deptInfo := range deptInfoList {
-				deptInfoMap[deptInfo.DeptId] = deptInfo
-			}
+	}
+	deptIdList, ok := needQueryMap["department"]
+	if ok && len(deptIdList) > 0 {
+		err = orm.Eloquent.Model(&system.SysRole{}).Where(" role_id IN (?)", deptIdList).Find(&deptInfoList).Error
+		for _, deptInfo := range deptInfoList {
+			deptInfoMap[deptInfo.DeptId] = deptInfo
 		}
 	}
 
@@ -425,6 +442,7 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 	}
 
 	for idx, cirInfo := range cirRes {
+		cirRes[idx].CreatorName = userInfoMap[cirInfo.Creator].NickName
 		if len(cirInfo.ProcessorIds) > 0 {
 			if cirInfo.ProcessMethod == "person" {
 				for i, userId := range cirInfo.ProcessorIds {

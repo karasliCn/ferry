@@ -680,15 +680,17 @@ func GenerateCirculationExcel(c *gin.Context, circulationList []service.Circulat
 	f.SetActiveSheet(index)
 	excelData := make([][]string, 0)
 
-	header := []string{"流程", "标题", "节点名称", "处理人", "创建时间", "完成时间", "挂起时间", "恢复时间", "备注"}
+	header := []string{"流程", "标题", "节点名称", "操作", "处理人", "创建时间", "创建人", "完成时间", "挂起时间", "恢复时间", "备注"}
 	excelData = append(excelData, header)
 	for _, circulationInfo := range circulationList {
 		rowData := make([]string, 0)
 		rowData = append(rowData, circulationInfo.ProcessName)
 		rowData = append(rowData, circulationInfo.Title)
 		rowData = append(rowData, circulationInfo.State)
+		rowData = append(rowData, circulationInfo.Action)
 		rowData = append(rowData, circulationInfo.ProcessorNames)
 		rowData = append(rowData, circulationInfo.CreateTime)
+		rowData = append(rowData, circulationInfo.CreatorName)
 		rowData = append(rowData, circulationInfo.EndTime)
 		rowData = append(rowData, circulationInfo.SuspendTime)
 		rowData = append(rowData, circulationInfo.ResumeTime)

@@ -22,8 +22,8 @@ settings:
     url: localhost:9527
   email:
     alias: ferry
-    host: mail.gacfinance.com.cn
-    pass: K@ras147
+    host: mail1.gacfinance.com.cn
+    pass: abcsdf
     port: 25
     user: lihanzhao@gacfinance.com.cn
   env: dev
@@ -65,6 +65,7 @@ settings:
     - jpg
     - jpeg
     - png
+    - gif
     - bmp
     - txt
     - xls
@@ -74,3 +75,8 @@ settings:
     - doc
     - docx
     - rft
+    - pdf
+    - zip
+    - rar
+    - msg
+    - em

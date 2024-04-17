@@ -22,7 +22,7 @@ settings:
     url: localhost:9527
   email:
     alias: ferry
-    host: mail.gacfinance.com.cn
+    host: mail1.gacfinance.com.cn
     pass: K@ras147
     port: 25
     user: lihanzhao@gacfinance.com.cn
@@ -62,15 +62,21 @@ settings:
     pem: temp/pem.pem
   upload:
     allowmimetype:
-    - jpg
-    - jpeg
-    - png
-    - bmp
-    - txt
-    - xls
-    - xlsx
-    - ppt
-    - pptx
-    - doc
-    - docx
-    - rft
+      - jpg
+      - jpeg
+      - png
+      - gif
+      - bmp
+      - txt
+      - xls
+      - xlsx
+      - ppt
+      - pptx
+      - doc
+      - docx
+      - rft
+      - pdf
+      - zip
+      - rar
+      - msg
+      - em
