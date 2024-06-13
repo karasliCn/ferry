@@ -61,6 +61,7 @@ settings:
     key: keystring
     pem: temp/pem.pem
   upload:
+    saveFilePath: static/uploaddata/
     allowmimetype:
       - jpg
       - jpeg

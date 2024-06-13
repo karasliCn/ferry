@@ -66,8 +66,8 @@ func CreateWorkOrder(c *gin.Context) (err error) {
 	if err != nil {
 		return
 	}
-	transformVariableValue(variableValue, workOrderValue.Tpls["form_data"])
-	err = GetVariableValueWithWorkOrderId(variableValue, tools.GetUserId(c), workOrderValue.Id)
+	//transformVariableValue(variableValue, workOrderValue.Tpls["form_data"])
+	//err = GetVariableValueWithWorkOrderId(variableValue, tools.GetUserId(c))
 	if err != nil {
 		err = fmt.Errorf("获取处理人变量值失败，%v", err.Error())
 		return
@@ -186,6 +186,7 @@ func CreateWorkOrder(c *gin.Context) (err error) {
 					"label":          targetStateValue["label"],
 					"processor":      targetStateValue["assignValue"],
 					"process_method": targetStateValue["assignType"],
+					"processed":      false,
 				})
 			}
 		} else {
@@ -196,7 +197,7 @@ func CreateWorkOrder(c *gin.Context) (err error) {
 
 	transformVariableValue(variableValue, workOrderValue.Tpls["form_data"])
 	// 获取变量数据
-	err = GetVariableValueWithWorkOrderId(variableValue, tools.GetUserId(c), workOrderValue.Id)
+	err = GetVariableValueWithWorkOrderId(variableValue, tools.GetUserId(c))
 	if err != nil {
 		return
 	}

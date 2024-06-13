@@ -80,3 +80,4 @@ settings:
     - rar
     - msg
     - em
+    savefilepath: static/uploaddata/

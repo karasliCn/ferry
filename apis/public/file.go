@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 
@@ -66,8 +67,10 @@ func UploadFile(c *gin.Context) {
 	if tag == "" {
 		tag = "1"
 	}
-
-	saveFilePath = "static/uploadfile/" + fileType + "/"
+	guid := strings.ReplaceAll(uuid.New().String(), "-", "")
+	dateString := time.Now().Format("20060102")
+	baseSaveFilePath := viper.GetString("settings.upload.saveFilePath")
+	saveFilePath = baseSaveFilePath + fileType + "/" + dateString + "/" + guid + "/"
 	_, err = os.Stat(saveFilePath)
 	if os.IsNotExist(err) {
 		err = os.MkdirAll(saveFilePath, 0755)
@@ -76,8 +79,6 @@ func UploadFile(c *gin.Context) {
 			return
 		}
 	}
-
-	guid := strings.ReplaceAll(uuid.New().String(), "-", "")
 
 	switch tag {
 	case "1": // 单图
@@ -92,7 +93,7 @@ func UploadFile(c *gin.Context) {
 			return
 		}
 		// 上传文件至指定目录
-		singleFile := saveFilePath + guid + "-" + files.Filename
+		singleFile := saveFilePath + files.Filename
 		_ = c.SaveUploadedFile(files, singleFile)
 		app.OK(c, urlPrefix+singleFile, "上传成功")
 		return
@@ -108,8 +109,7 @@ func UploadFile(c *gin.Context) {
 		}
 		for _, f := range files {
 
-			guid = strings.ReplaceAll(uuid.New().String(), "-", "")
-			multipartFileName := saveFilePath + guid + "-" + f.Filename
+			multipartFileName := saveFilePath + f.Filename
 			_ = c.SaveUploadedFile(f, multipartFileName)
 			multipartFile = append(multipartFile, urlPrefix+multipartFileName)
 		}
@@ -118,8 +118,8 @@ func UploadFile(c *gin.Context) {
 	case "3": // base64
 		files, _ := c.GetPostForm("file")
 		ddd, _ := base64.StdEncoding.DecodeString(files)
-		_ = ioutil.WriteFile(saveFilePath+guid+".jpg", ddd, 0666)
-		app.OK(c, urlPrefix+saveFilePath+guid+".jpg", "上传成功")
+		_ = ioutil.WriteFile(saveFilePath+".jpg", ddd, 0666)
+		app.OK(c, urlPrefix+saveFilePath+".jpg", "上传成功")
 	default:
 		app.Error(c, 200, errors.New(""), "标识不正确")
 		return

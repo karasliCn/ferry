@@ -110,8 +110,10 @@ func (w *WorkOrder) buildQuery() (dbObj *gorm.DB, err error) {
 		processorInfo system.SysUser
 	)
 
-	personSelectValue := "(JSON_CONTAINS(p_work_order_info.state, JSON_OBJECT('processor', %v)) and JSON_CONTAINS(p_work_order_info.state, JSON_OBJECT('process_method', 'person')))"
-	roleSelectValue := "(JSON_CONTAINS(p_work_order_info.state, JSON_OBJECT('processor', %v)) and JSON_CONTAINS(p_work_order_info.state, JSON_OBJECT('process_method', 'role')))"
+	//personSelectValue := "(JSON_CONTAINS(p_work_order_info.state, JSON_OBJECT('processor', %v)) and JSON_CONTAINS(p_work_order_info.state, JSON_OBJECT('process_method', 'person')))"
+	personSelectValueTodo := "(JSON_CONTAINS(p_work_order_info.state, JSON_OBJECT('processor', %v, 'process_method', 'person', 'processed', false)))"
+	//roleSelectValue := "(JSON_CONTAINS(p_work_order_info.state, JSON_OBJECT('processor', %v)) and JSON_CONTAINS(p_work_order_info.state, JSON_OBJECT('process_method', 'role')))"
+	roleSelectValueTodo := "(JSON_CONTAINS(p_work_order_info.state, JSON_OBJECT('processor', %v, 'process_method', 'role', 'processed', false)))"
 	departmentSelectValue := "(JSON_CONTAINS(p_work_order_info.state, JSON_OBJECT('processor', %v)) and JSON_CONTAINS(p_work_order_info.state, JSON_OBJECT('process_method', 'department')))"
 
 	title := w.GinObj.DefaultQuery("title", "")
@@ -152,10 +154,10 @@ func (w *WorkOrder) buildQuery() (dbObj *gorm.DB, err error) {
 	case 1:
 		// 待办工单
 		// 1. 个人
-		personSelect := fmt.Sprintf(personSelectValue, tools.GetUserId(w.GinObj))
+		personSelect := fmt.Sprintf(personSelectValueTodo, tools.GetUserId(w.GinObj))
 
 		// 2. 角色
-		roleSelect := fmt.Sprintf(roleSelectValue, tools.GetRoleId(w.GinObj))
+		roleSelect := fmt.Sprintf(roleSelectValueTodo, tools.GetRoleId(w.GinObj))
 
 		// 3. 部门
 		var userInfo system.SysUser
@@ -189,8 +191,8 @@ func (w *WorkOrder) buildQuery() (dbObj *gorm.DB, err error) {
 			return nil, err
 		}
 		db = db.Where(fmt.Sprintf("(%v or %v or %v) and p_work_order_info.is_end = 0",
-			fmt.Sprintf(personSelectValue, processorInfo.UserId),
-			fmt.Sprintf(roleSelectValue, processorInfo.RoleId),
+			fmt.Sprintf(personSelectValueTodo, processorInfo.UserId),
+			fmt.Sprintf(roleSelectValueTodo, processorInfo.RoleId),
 			fmt.Sprintf(departmentSelectValue, processorInfo.DeptId),
 		))
 	}
@@ -207,8 +209,6 @@ func (w *WorkOrder) buildQuery() (dbObj *gorm.DB, err error) {
 func (w *WorkOrder) WorkOrderList() (result interface{}, err error) {
 
 	var (
-		principals        string
-		stateList         []map[string]interface{}
 		workOrderInfoList []workOrderInfo
 		minusTotal        int
 	)
@@ -220,9 +220,10 @@ func (w *WorkOrder) WorkOrderList() (result interface{}, err error) {
 
 	for i, v := range *result.(*pagination.Paginator).Data.(*[]workOrderInfo) {
 		var (
-			stateName string
-			//structResult map[string]interface{}
+			stateName  string
 			authStatus bool
+			stateList  []map[string]interface{}
+			principals string
 		)
 		err = json.Unmarshal(v.State, &stateList)
 		if err != nil {
@@ -252,34 +253,27 @@ func (w *WorkOrder) WorkOrderList() (result interface{}, err error) {
 
 			processorListByMethod := make(map[string][]int, 0)
 			allProcessorList := make([]string, 0)
-			if len(stateList) > 1 {
+			if len(stateList) > 0 {
 				for _, s := range stateList {
-					if s["processed"] != true {
-						for _, p := range s["processor"].([]interface{}) {
-							pMethod := (s["process_method"]).(string)
-							processorId := int(p.(float64))
+					if s["processed"] == true {
+						continue
+					}
+					for _, p := range s["processor"].([]interface{}) {
+						pMethod := (s["process_method"]).(string)
+						processorId := int(p.(float64))
 
-							processorListByMethod[pMethod] = append(processorListByMethod[pMethod], processorId)
-							methodProcessor := pMethod + ":" + strconv.Itoa(processorId)
-							allProcessorList = append(allProcessorList, methodProcessor)
+						processorListByMethod[pMethod] = append(processorListByMethod[pMethod], processorId)
+						methodProcessor := pMethod + ":" + strconv.Itoa(processorId)
+						allProcessorList = append(allProcessorList, methodProcessor)
+					}
+					if len(processorListByMethod) > 0 {
+						if len(stateName) > 0 {
+							stateName = stateName + ", "
 						}
-						if len(processorListByMethod) > 0 {
-							if len(stateName) > 0 {
-								stateName = stateName + ", "
-							}
-							stateName = stateName + s["label"].(string)
-							//break
-						}
+						stateName = stateName + s["label"].(string)
+						//break
 					}
 				}
-			}
-			if len(processorListByMethod) == 0 {
-				processIdList := make([]int, 0)
-				for _, v := range stateList[0]["processor"].([]interface{}) {
-					processIdList = append(processIdList, int(v.(float64)))
-				}
-				processorListByMethod[stateList[0]["process_method"].(string)] = processIdList
-				stateName = stateList[0]["label"].(string)
 			}
 			principals, err = GetPrincipal(processorListByMethod, allProcessorList)
 			if err != nil {

@@ -190,7 +190,7 @@ func (h *Handle) circulation() (err error) {
 	if err != nil {
 		return err
 	}
-	err = GetVariableValueWithWorkOrderId(stateList, h.workOrderDetails.Creator, h.workOrderId)
+	err = GetVariableValueWithWorkOrderId(stateList, h.workOrderDetails.Creator)
 	if err != nil {
 		return err
 	}
@@ -378,7 +378,7 @@ func (h *Handle) commonProcessing(c *gin.Context) (err error) {
 		if err != nil {
 			err = fmt.Errorf("工单跳转失败，%v", err.Error())
 		}
-		edgeMap := make(map[string][]string)
+		//edgeMap := make(map[string][]string)
 
 		var processInfo process.Info
 		err = orm.Eloquent.Model(&process.Info{}).Where(" id = ?", h.workOrderDetails.Process).Find(&processInfo).Error
@@ -387,45 +387,30 @@ func (h *Handle) commonProcessing(c *gin.Context) (err error) {
 			return err
 		}
 
-		toCheckNodes := []string{h.targetStateValue["id"].(string)}
-		inEffectSource := []string{h.targetStateValue["id"].(string)}
 		procStruc := make(map[string]interface{})
 		_ = json.Unmarshal(processInfo.Structure, &procStruc)
-		procEdges := procStruc["edges"].([]interface{})
-		for i := range procEdges {
-			edge := procEdges[i].(map[string]interface{})
-			edgeFlowProps, err := strconv.Atoi(edge["flowProperties"].(string))
-			if err != nil {
-				return err
-			}
-			if edgeFlowProps == constants.FlowProperties_Agree {
-				source := edge["source"].(string)
-				targets, ok := edgeMap[source]
-				if !ok {
-					edgeMap[source] = []string{edge["target"].(string)}
-				} else {
-					edgeMap[source] = append(targets, edge["target"].(string))
-				}
-			}
-		}
+		//procEdges := procStruc["edges"].([]interface{})
+		discardNodes, err := h.getDiscardNodes(procStruc)
 
-		for {
-			if len(toCheckNodes) == 0 {
-				break
-			}
-			targets, ok := edgeMap[toCheckNodes[0]]
-			if ok {
-				inEffectSource = append(inEffectSource, targets...)
-				toCheckNodes = append(toCheckNodes, targets...)
-			}
-			toCheckNodes = append(toCheckNodes[1:])
-		}
+		h.updateValue["state"] = h.filterStateNodes(discardNodes)
 
-		err = orm.Eloquent.Model(&process.CirculationHistory{}).Where(" work_order = ? and source in (?) and is_effect = 1", h.workOrderId, inEffectSource).Update("is_effect", 0).Error
+		err = h.tx.Model(&process.CirculationHistory{}).Where(" work_order = ? and source in (?) and is_effect = 1", h.workOrderId, discardNodes).Update("is_effect", 0).Error
 		if err != nil {
 			err = fmt.Errorf("工单跳转失败，%v", err.Error())
 		}
-		return
+
+		stateValue, _ := json.Marshal(h.updateValue["state"])
+
+		err = h.tx.Model(&process.WorkOrderInfo{}).
+			Where("id = ?", h.workOrderId).
+			Updates(map[string]interface{}{
+				"state": stateValue,
+			}).Error
+		if err != nil {
+			h.tx.Rollback()
+			return err
+		}
+		return nil
 	}
 
 	// 会签
@@ -456,6 +441,66 @@ func (h *Handle) commonProcessing(c *gin.Context) (err error) {
 		}
 	}
 	return
+}
+
+func (h *Handle) filterStateNodes(discardNodes []string) []map[string]interface{} {
+	updateValState := make([]map[string]interface{}, 0)
+	for _, stateItem := range h.updateValue["state"].([]map[string]interface{}) {
+		//state := h.updateValue["state"].([]map[string]interface{})
+		shouldAdd := true
+		for _, discardNode := range discardNodes {
+			if stateItem["id"] == discardNode && stateItem["id"] != h.targetStateValue["id"] {
+				shouldAdd = false
+			}
+		}
+		if shouldAdd {
+			updateValState = append(updateValState, stateItem)
+		}
+	}
+	return updateValState
+}
+
+func (h *Handle) getDiscardNodes(processStructure map[string]interface{}) ([]string, error) {
+	toCheckNodes := []string{h.targetStateValue["id"].(string)}
+	inEffectSource := []string{h.targetStateValue["id"].(string)}
+	edgeMap := make(map[string][]string)
+	procEdges := processStructure["edges"].([]interface{})
+	for i := range procEdges {
+		edge := procEdges[i].(map[string]interface{})
+		edgeFlowProps, err := strconv.Atoi(edge["flowProperties"].(string))
+		if err != nil {
+			return nil, err
+		}
+		if edgeFlowProps == constants.FlowProperties_Agree {
+			source := edge["source"].(string)
+			targets, ok := edgeMap[source]
+			if !ok {
+				edgeMap[source] = []string{edge["target"].(string)}
+			} else {
+				edgeMap[source] = append(targets, edge["target"].(string))
+			}
+		}
+	}
+	processed := make(map[string]bool)
+	for {
+		if len(toCheckNodes) == 0 {
+			break
+		}
+		// 已处理过的节点跳过
+		if _, ok := processed[toCheckNodes[0]]; ok {
+			toCheckNodes = append(toCheckNodes[1:])
+			continue
+		}
+
+		processed[toCheckNodes[0]] = true
+		targets, ok := edgeMap[toCheckNodes[0]]
+		if ok {
+			inEffectSource = append(inEffectSource, targets...)
+			toCheckNodes = append(toCheckNodes, targets...)
+		}
+		toCheckNodes = append(toCheckNodes[1:])
+	}
+	return inEffectSource, nil
 }
 
 func (h *Handle) HandleWorkOrder(
@@ -650,6 +695,7 @@ func (h *Handle) HandleWorkOrder(
 						"label":          h.targetStateValue["label"],
 						"processor":      h.targetStateValue["assignValue"],
 						"process_method": h.targetStateValue["assignType"],
+						"processed":      false,
 					}}
 					err = h.commonProcessing(c)
 					if err != nil {
@@ -696,6 +742,7 @@ func (h *Handle) HandleWorkOrder(
 					"label":          targetStateValue["label"],
 					"processor":      targetStateValue["assignValue"],
 					"process_method": targetStateValue["assignType"],
+					"processed":      false,
 				})
 			}
 
@@ -738,6 +785,7 @@ func (h *Handle) HandleWorkOrder(
 					"label":          h.targetStateValue["label"],
 					"processor":      endAssignValue,
 					"process_method": endAssignType,
+					"processed":      false,
 				}}
 
 				var currentWoStateList []map[string]interface{}
@@ -815,6 +863,9 @@ func (h *Handle) HandleWorkOrder(
 		if len(currentWoStateList) > 1 {
 			for _, curWoState := range currentWoStateList {
 				if curWoState["id"] != h.stateValue["id"] {
+					if curWoState["processed"] != true {
+						curWoState["processed"] = false
+					}
 					h.updateValue["state"] = append(h.updateValue["state"].([]map[string]interface{}), curWoState)
 				}
 			}
@@ -833,6 +884,9 @@ func (h *Handle) HandleWorkOrder(
 		err = json.Unmarshal(h.workOrderDetails.State, &currentWoStateList)
 		for _, curWoState := range currentWoStateList {
 			if curWoState["id"] != h.stateValue["id"] {
+				if curWoState["processed"] != true {
+					curWoState["processed"] = false
+				}
 				h.updateValue["state"] = append(h.updateValue["state"].([]map[string]interface{}), curWoState)
 			}
 		}
