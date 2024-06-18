@@ -11,6 +11,7 @@ import (
 	"ferry/pkg/jsonTime"
 	"ferry/pkg/notify"
 	"ferry/tools"
+	"ferry/tools/app"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -696,6 +697,7 @@ func (h *Handle) HandleWorkOrder(
 						"processor":      h.targetStateValue["assignValue"],
 						"process_method": h.targetStateValue["assignType"],
 						"processed":      false,
+						"createdAt":      time.Now().Format(constants.TimeFormat),
 					}}
 					err = h.commonProcessing(c)
 					if err != nil {
@@ -743,6 +745,7 @@ func (h *Handle) HandleWorkOrder(
 					"processor":      targetStateValue["assignValue"],
 					"process_method": targetStateValue["assignType"],
 					"processed":      false,
+					"createdAt":      time.Now().Format(constants.TimeFormat),
 				})
 			}
 
@@ -786,6 +789,7 @@ func (h *Handle) HandleWorkOrder(
 					"processor":      endAssignValue,
 					"process_method": endAssignType,
 					"processed":      false,
+					"createdAt":      time.Now().Format(constants.TimeFormat),
 				}}
 
 				var currentWoStateList []map[string]interface{}
@@ -1182,6 +1186,7 @@ func (h *Handle) SuspendWorkOrder(
 	workOrderId int,
 	isSuspend bool,
 	currentState string,
+	remarks string,
 ) (err error) {
 	h.workOrderId = workOrderId
 
@@ -1207,6 +1212,16 @@ func (h *Handle) SuspendWorkOrder(
 		return
 	}
 
+	// 获取当前用户信息
+	var currentUserInfo system.SysUser
+	err = orm.Eloquent.Model(&currentUserInfo).
+		Where("user_id = ?", tools.GetUserId(c)).
+		Find(&currentUserInfo).Error
+	if err != nil {
+		app.Error(c, -1, err, fmt.Sprintf("当前用户查询失败，%v", err.Error()))
+		return
+	}
+
 	var stateValue []map[string]interface{}
 	err = json.Unmarshal(h.workOrderDetails.State, &stateValue)
 	var targetState map[string]interface{}
@@ -1215,6 +1230,8 @@ func (h *Handle) SuspendWorkOrder(
 			targetState = state
 		}
 	}
+
+	actionLabel := "挂起"
 	if isSuspend {
 		targetState["is_suspend"] = true
 		targetState["suspend_time"] = time.Now().Format(constants.TimeFormat)
@@ -1224,11 +1241,26 @@ func (h *Handle) SuspendWorkOrder(
 		targetState["is_suspend"] = false
 		targetState["operator"] = tools.GetUserId(c)
 		targetState["resume_time"] = time.Now().Format(constants.TimeFormat)
+		actionLabel = "恢复"
 	}
 
 	stateMarshalVal, err := json.Marshal(stateValue)
 	// 开启事务
 	h.tx = orm.Eloquent.Begin()
+
+	// 添加转交历史
+	h.tx.Create(&process.CirculationHistory{
+		Title:        h.workOrderDetails.Title,
+		WorkOrder:    h.workOrderDetails.Id,
+		State:        targetState["label"].(string),
+		Circulation:  actionLabel,
+		Processor:    currentUserInfo.NickName,
+		ProcessorId:  tools.GetUserId(c),
+		Remarks:      remarks,
+		Status:       2, // 其他
+		CostDuration: int64(time.Since(h.workOrderDetails.UpdatedAt.Time) / 1000 / 1000 / 1000),
+		IsEffect:     0,
+	})
 
 	err = orm.Eloquent.Model(&process.WorkOrderInfo{}).Where("id = ?", workOrderId).Update("state", stateMarshalVal).Error
 

@@ -326,14 +326,12 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 	}
 
 	var currentWorkOrderId int
-	var lastEndTime string
 
-	for _, v := range circulationList {
+	for idx, v := range circulationList {
 		woInfo, ok := workOrderInfoMap[v.WorkOrder]
 		if ok {
 			if currentWorkOrderId != v.WorkOrder {
 				currentWorkOrderId = v.WorkOrder
-				lastEndTime = ""
 				state := make([]map[string]interface{}, 0)
 				_ = json.Unmarshal(woInfo.State, &state)
 				for _, s := range state {
@@ -344,13 +342,17 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 						needQueryMap[s["process_method"].(string)] = make([]int, 0)
 					}
 
+					createTime := woInfo.UpdatedAt.Format(constants.TimeFormat)
+					if _, ok := s["createdAt"]; ok {
+						createTime = s["createdAt"].(string)
+					}
 					cirInfo := CirculationInfo{
 						ProcessName:   woInfo.ProcessName,
 						ProcessorIds:  []int{},
 						ProcessMethod: s["process_method"].(string),
 						Title:         woInfo.Title,
 						State:         s["label"].(string),
-						CreateTime:    woInfo.UpdatedAt.Format(constants.TimeFormat),
+						CreateTime:    createTime,
 						Creator:       woInfo.Creator,
 					}
 
@@ -383,13 +385,17 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 				Action:         v.Circulation,
 				Creator:        woInfo.Creator,
 			}
-
-			if lastEndTime == "" {
-				cirInfo.CreateTime = woInfo.CreatedAt.Format(constants.TimeFormat)
-			} else {
-				cirInfo.CreateTime = lastEndTime
+			endIdx := len(circulationList) - 1
+			if idx < endIdx && circulationList[idx].WorkOrder == circulationList[idx+1].WorkOrder {
+				cirInfo.CreateTime = circulationList[idx+1].CreatedAt.Format(constants.TimeFormat)
 			}
-			lastEndTime = cirInfo.EndTime
+			if idx < endIdx && circulationList[idx].WorkOrder != circulationList[idx+1].WorkOrder {
+				cirInfo.CreateTime = woInfo.CreatedAt.Format(constants.TimeFormat)
+			}
+			if idx == endIdx {
+				cirInfo.CreateTime = woInfo.CreatedAt.Format(constants.TimeFormat)
+			}
+
 			if !v.SuspendTime.IsZero() {
 				cirInfo.SuspendTime = v.SuspendTime.Format(constants.TimeFormat)
 			}

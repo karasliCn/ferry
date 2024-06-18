@@ -586,6 +586,7 @@ func SuspendWorkOrder(c *gin.Context) {
 			WorkOrderId int    `json:"work_order_id"` // 工单ID
 			IsSuspend   bool   `json:"is_suspend"`    // 是否执行任务
 			SourceState string `json:"source_state"`  // 源状态
+			Remarks     string `json:"remarks"`
 		}
 	)
 
@@ -611,6 +612,7 @@ func SuspendWorkOrder(c *gin.Context) {
 		params.WorkOrderId, // 工单ID
 		params.IsSuspend,
 		params.SourceState,
+		params.Remarks,
 	)
 	if err != nil {
 		app.Error(c, -1, err, fmt.Sprintf("处理工单失败，%v", err.Error()))
@@ -680,7 +682,8 @@ func GenerateCirculationExcel(c *gin.Context, circulationList []service.Circulat
 	f.SetActiveSheet(index)
 	excelData := make([][]string, 0)
 
-	header := []string{"流程", "标题", "节点名称", "操作", "处理人", "创建时间", "创建人", "完成时间", "挂起时间", "恢复时间", "备注"}
+	//header := []string{"流程", "标题", "节点名称", "操作", "处理人", "创建时间", "创建人", "完成时间", "挂起时间", "恢复时间", "备注"}
+	header := []string{"流程", "标题", "节点名称", "操作", "处理人", "创建时间", "创建人", "完成时间", "备注"}
 	excelData = append(excelData, header)
 	for _, circulationInfo := range circulationList {
 		rowData := make([]string, 0)
@@ -692,8 +695,8 @@ func GenerateCirculationExcel(c *gin.Context, circulationList []service.Circulat
 		rowData = append(rowData, circulationInfo.CreateTime)
 		rowData = append(rowData, circulationInfo.CreatorName)
 		rowData = append(rowData, circulationInfo.EndTime)
-		rowData = append(rowData, circulationInfo.SuspendTime)
-		rowData = append(rowData, circulationInfo.ResumeTime)
+		//rowData = append(rowData, circulationInfo.SuspendTime)
+		//rowData = append(rowData, circulationInfo.ResumeTime)
 		rowData = append(rowData, circulationInfo.Remarks)
 		excelData = append(excelData, rowData)
 	}
