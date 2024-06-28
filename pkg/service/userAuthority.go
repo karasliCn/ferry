@@ -2,7 +2,6 @@ package service
 
 import (
 	"encoding/json"
-	"errors"
 	"ferry/global/orm"
 	"ferry/models/process"
 	"ferry/models/system"
@@ -148,9 +147,6 @@ func JudgeUserAuthority(c *gin.Context, workOrderId int, currentState string) (s
 				}
 			}
 		}
-	}
-	if currentStateValue["process_method"] == nil || len(currentStateValue["process_method"].(string)) == 0 {
-		return false, errors.New("currentState process_method is nil")
 	}
 
 	switch currentStateValue["process_method"].(string) {
@@ -325,10 +321,6 @@ func JudgeUserAuthorityWithStateList(c *gin.Context, workOrderId int) (status bo
 					}
 				}
 			}
-		}
-
-		if currentState["process_method"] == nil || len(currentState["process_method"].(string)) == 0 {
-			return false, errors.New("currentState process_method is nil")
 		}
 
 		switch currentState["process_method"].(string) {
