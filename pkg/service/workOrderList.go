@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	"strconv"
+	"time"
 )
 
 /*
@@ -53,6 +54,7 @@ type CirculationInfo struct {
 	Action         string `json:"action"`
 	Creator        int    `json:"creator"`
 	CreatorName    string `json:"creator_name"`
+	Duration       int    `json:"duration"`
 }
 
 type ProcessEdges struct {
@@ -327,13 +329,14 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 
 	var currentWorkOrderId int
 
-	for idx, v := range circulationList {
+	for _, v := range circulationList {
 		woInfo, ok := workOrderInfoMap[v.WorkOrder]
 		if ok {
 			if currentWorkOrderId != v.WorkOrder {
 				currentWorkOrderId = v.WorkOrder
 				state := make([]map[string]interface{}, 0)
 				_ = json.Unmarshal(woInfo.State, &state)
+				// 当前state节点处理
 				for _, s := range state {
 					if s["processed"] == true {
 						continue
@@ -343,6 +346,7 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 					}
 
 					createTime := woInfo.UpdatedAt.Format(constants.TimeFormat)
+					//
 					if _, ok := s["createdAt"]; ok {
 						createTime = s["createdAt"].(string)
 					}
@@ -373,6 +377,7 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 				}
 
 			}
+			// 流转历史处理
 			cirInfo := CirculationInfo{
 				ProcessName:    woInfo.ProcessName,
 				Title:          woInfo.Title,
@@ -384,16 +389,14 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 				Remarks:        v.Remarks,
 				Action:         v.Circulation,
 				Creator:        woInfo.Creator,
+				Duration:       int(v.CostDuration),
 			}
-			endIdx := len(circulationList) - 1
-			if idx < endIdx && circulationList[idx].WorkOrder == circulationList[idx+1].WorkOrder {
-				cirInfo.CreateTime = circulationList[idx+1].CreatedAt.Format(constants.TimeFormat)
-			}
-			if idx < endIdx && circulationList[idx].WorkOrder != circulationList[idx+1].WorkOrder {
-				cirInfo.CreateTime = woInfo.CreatedAt.Format(constants.TimeFormat)
-			}
-			if idx == endIdx {
-				cirInfo.CreateTime = woInfo.CreatedAt.Format(constants.TimeFormat)
+
+			// 历史数据处理，如果流转历史有记录节点创建时间，使用该时间，没有的话根据（流转历史创建时间-处理时间）计算创建时间
+			if v.NodeCreatedAt != nil {
+				cirInfo.CreateTime = v.NodeCreatedAt.Format(constants.TimeFormat)
+			} else {
+				cirInfo.CreateTime = v.CreatedAt.Time.Add(-time.Duration(v.CostDuration) * 1000 * 1000 * 1000).Format(constants.TimeFormat)
 			}
 
 			if !v.SuspendTime.IsZero() {

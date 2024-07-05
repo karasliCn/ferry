@@ -642,6 +642,16 @@ func (h *Handle) HandleWorkOrder(
 		"related_person": relatedPersonValue,
 	}
 
+	var currentWoStateList []map[string]interface{}
+	err = json.Unmarshal(h.workOrderDetails.State, &currentWoStateList)
+	var currentWorkOderState map[string]any
+
+	for _, curWoState := range currentWoStateList {
+		if curWoState["id"] == h.stateValue["id"] {
+			currentWorkOderState = curWoState
+		}
+	}
+
 	// 开启事务
 	h.tx = orm.Eloquent.Begin()
 
@@ -749,8 +759,8 @@ func (h *Handle) HandleWorkOrder(
 				})
 			}
 
-			var currentWoStateList []map[string]interface{}
-			err = json.Unmarshal(h.workOrderDetails.State, &currentWoStateList)
+			//var currentWoStateList []map[string]interface{}
+			//err = json.Unmarshal(h.workOrderDetails.State, &currentWoStateList)
 			if len(currentWoStateList) > 1 {
 				for _, curWoState := range currentWoStateList {
 					if curWoState["id"] != h.stateValue["id"] {
@@ -792,8 +802,8 @@ func (h *Handle) HandleWorkOrder(
 					"createdAt":      time.Now().Format(constants.TimeFormat),
 				}}
 
-				var currentWoStateList []map[string]interface{}
-				err = json.Unmarshal(h.workOrderDetails.State, &currentWoStateList)
+				//var currentWoStateList []map[string]interface{}
+				//err = json.Unmarshal(h.workOrderDetails.State, &currentWoStateList)
 				if len(currentWoStateList) > 1 {
 					for _, curWoState := range currentWoStateList {
 						if curWoState["id"] != h.stateValue["id"] {
@@ -817,8 +827,8 @@ func (h *Handle) HandleWorkOrder(
 				}
 			} else {
 				h.endHistory = false
-				var currentWoStateList []map[string]interface{}
-				err = json.Unmarshal(h.workOrderDetails.State, &currentWoStateList)
+				//var currentWoStateList []map[string]interface{}
+				//err = json.Unmarshal(h.workOrderDetails.State, &currentWoStateList)
 				for _, curWoState := range currentWoStateList {
 					if curWoState["id"] == h.stateValue["id"] {
 						curWoState["processed"] = true
@@ -862,8 +872,8 @@ func (h *Handle) HandleWorkOrder(
 		stateValue["processor"] = h.targetStateValue["assignValue"]
 		h.updateValue["state"] = []map[string]interface{}{stateValue}
 
-		var currentWoStateList []map[string]interface{}
-		err = json.Unmarshal(h.workOrderDetails.State, &currentWoStateList)
+		//var currentWoStateList []map[string]interface{}
+		//err = json.Unmarshal(h.workOrderDetails.State, &currentWoStateList)
 		if len(currentWoStateList) > 1 {
 			for _, curWoState := range currentWoStateList {
 				if curWoState["id"] != h.stateValue["id"] {
@@ -884,8 +894,8 @@ func (h *Handle) HandleWorkOrder(
 		stateValue["processor"] = h.targetStateValue["assignValue"]
 		h.updateValue["state"] = []map[string]interface{}{stateValue}
 
-		var currentWoStateList []map[string]interface{}
-		err = json.Unmarshal(h.workOrderDetails.State, &currentWoStateList)
+		//var currentWoStateList []map[string]interface{}
+		//err = json.Unmarshal(h.workOrderDetails.State, &currentWoStateList)
 		for _, curWoState := range currentWoStateList {
 			if curWoState["id"] != h.stateValue["id"] {
 				if curWoState["processed"] != true {
@@ -975,10 +985,18 @@ func (h *Handle) HandleWorkOrder(
 		h.tx.Rollback()
 		return
 	}
-	for _, t := range cirHistoryValue {
-		if t.Source != h.stateValue["id"] {
-			costDuration := time.Since(t.CreatedAt.Time)
-			costDurationValue = int64(costDuration) / 1000 / 1000 / 1000
+
+	if createdAt, ok := currentWorkOderState["createdAt"]; ok {
+		stateCreatedAt, _ := time.ParseInLocation(constants.TimeFormat, createdAt.(string), time.Local)
+		costDuration := time.Since(stateCreatedAt)
+		costDurationValue = int64(costDuration) / 1000 / 1000 / 1000
+	} else {
+		// 兼容处理，历史数据p_work_order_info.state 元素中没有createdAt
+		for _, t := range cirHistoryValue {
+			if t.Source != h.stateValue["id"] {
+				costDuration := time.Since(t.CreatedAt.Time)
+				costDurationValue = int64(costDuration) / 1000 / 1000 / 1000
+			}
 		}
 	}
 
@@ -1004,6 +1022,10 @@ func (h *Handle) HandleWorkOrder(
 		CostDuration: costDurationValue,
 		Remarks:      remarks,
 		IsEffect:     1,
+	}
+	if nodeCreatedAt, ok := currentWorkOderState["createdAt"]; ok {
+		parsedCreateAt, _ := time.ParseInLocation(constants.TimeFormat, nodeCreatedAt.(string), time.Local)
+		cirHistoryData.NodeCreatedAt = &parsedCreateAt
 	}
 
 	if flowProperties == constants.FlowProperties_Discard {

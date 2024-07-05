@@ -141,6 +141,7 @@ func CreateWorkOrder(c *gin.Context) (err error) {
 					variableValue[0].(map[string]interface{})["label"] = nodeValue["label"]
 					variableValue[0].(map[string]interface{})["processor"] = nodeValue["assignValue"]
 					variableValue[0].(map[string]interface{})["process_method"] = nodeValue["assignType"]
+					variableValue[0].(map[string]interface{})["createdAt"] = time.Now().Format(constants.TimeFormat)
 					break breakTag
 				}
 			}
@@ -187,6 +188,7 @@ func CreateWorkOrder(c *gin.Context) (err error) {
 					"processor":      targetStateValue["assignValue"],
 					"process_method": targetStateValue["assignType"],
 					"processed":      false,
+					"createdAt":      time.Now().Format(constants.TimeFormat),
 				})
 			}
 		} else {
@@ -195,7 +197,10 @@ func CreateWorkOrder(c *gin.Context) (err error) {
 		}
 	}
 
-	transformVariableValue(variableValue, workOrderValue.Tpls["form_data"])
+	err = transformVariableValue(variableValue, workOrderValue.Tpls["form_data"])
+	if err != nil {
+		return err
+	}
 	// 获取变量数据
 	err = GetVariableValueWithWorkOrderId(variableValue, tools.GetUserId(c))
 	if err != nil {

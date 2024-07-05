@@ -12,7 +12,7 @@ import (
 	"ferry/tools"
 	"ferry/tools/app"
 	"fmt"
-	"github.com/xuri/excelize/v2"
+	excelize "github.com/xuri/excelize/v2"
 	"strconv"
 	"time"
 
@@ -683,7 +683,7 @@ func GenerateCirculationExcel(c *gin.Context, circulationList []service.Circulat
 	excelData := make([][]string, 0)
 
 	//header := []string{"流程", "标题", "节点名称", "操作", "处理人", "创建时间", "创建人", "完成时间", "挂起时间", "恢复时间", "备注"}
-	header := []string{"流程", "标题", "节点名称", "操作", "处理人", "创建时间", "创建人", "完成时间", "备注"}
+	header := []string{"流程", "标题", "节点名称", "操作", "处理人", "创建时间", "创建人", "完成时间", "处理耗时", "备注"}
 	excelData = append(excelData, header)
 	for _, circulationInfo := range circulationList {
 		rowData := make([]string, 0)
@@ -695,8 +695,7 @@ func GenerateCirculationExcel(c *gin.Context, circulationList []service.Circulat
 		rowData = append(rowData, circulationInfo.CreateTime)
 		rowData = append(rowData, circulationInfo.CreatorName)
 		rowData = append(rowData, circulationInfo.EndTime)
-		//rowData = append(rowData, circulationInfo.SuspendTime)
-		//rowData = append(rowData, circulationInfo.ResumeTime)
+		rowData = append(rowData, buildDurationString(circulationInfo.Duration))
 		rowData = append(rowData, circulationInfo.Remarks)
 		excelData = append(excelData, rowData)
 	}
@@ -715,4 +714,25 @@ func GenerateCirculationExcel(c *gin.Context, circulationList []service.Circulat
 	c.Writer.Header().Set("Content-Transfer-Encoding", "binary")
 	c.Writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", f.Path))
 	f.Write(c.Writer)
+}
+
+func buildDurationString(duration int) (durationString string) {
+	unitStrArray := []string{"日", "小时", "分钟", "秒"}
+	unitInSec := []int{86400, 3600, 60, 1}
+	durationValue := duration
+	if duration == 0 {
+		return strconv.Itoa(durationValue) + unitStrArray[len(unitStrArray)-1]
+	}
+	for idx, unitStr := range unitStrArray {
+		if idx == len(unitStrArray) {
+			durationString = durationString + strconv.Itoa(durationValue) + unitStr
+		} else {
+			v := durationValue / unitInSec[idx]
+			durationValue = durationValue % unitInSec[idx]
+			if v > 0 {
+				durationString = durationString + strconv.Itoa(v) + unitStr
+			}
+		}
+	}
+	return
 }
