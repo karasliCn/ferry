@@ -656,8 +656,10 @@ func (h *Handle) HandleWorkOrder(
 	h.tx = orm.Eloquent.Begin()
 
 	stateValue := map[string]interface{}{
-		"label": h.targetStateValue["label"].(string),
-		"id":    h.targetStateValue["id"].(string),
+		"label":     h.targetStateValue["label"].(string),
+		"id":        h.targetStateValue["id"].(string),
+		"processed": false,
+		"createdAt": time.Now().Format(constants.TimeFormat),
 	}
 
 	sourceEdges, err = h.processState.GetEdge(h.targetStateValue["id"].(string), "source")
