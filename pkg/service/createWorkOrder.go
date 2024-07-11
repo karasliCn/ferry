@@ -195,6 +195,8 @@ func CreateWorkOrder(c *gin.Context) (err error) {
 			err = errors.New("并行网关流程配置不正确")
 			return
 		}
+	default:
+		variableValue[0].(map[string]interface{})["createdAt"] = time.Now().Format(constants.TimeFormat)
 	}
 
 	err = transformVariableValue(variableValue, workOrderValue.Tpls["form_data"])
