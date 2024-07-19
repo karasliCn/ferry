@@ -39,6 +39,7 @@ type workOrderInfo struct {
 }
 
 type CirculationInfo struct {
+	WorkOrderId    int    `json:"work_order_id"`
 	ProcessName    string `json:"process_name"`
 	Title          string `json:"title"`
 	State          string `json:"state"`
@@ -351,6 +352,7 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 						createTime = s["createdAt"].(string)
 					}
 					cirInfo := CirculationInfo{
+						WorkOrderId:   woInfo.Id,
 						ProcessName:   woInfo.ProcessName,
 						ProcessorIds:  []int{},
 						ProcessMethod: s["process_method"].(string),
@@ -379,6 +381,7 @@ func (w *WorkOrder) WorkOrderCirculationList() (result []CirculationInfo, err er
 			}
 			// 流转历史处理
 			cirInfo := CirculationInfo{
+				WorkOrderId:    woInfo.Id,
 				ProcessName:    woInfo.ProcessName,
 				Title:          woInfo.Title,
 				State:          v.State,
