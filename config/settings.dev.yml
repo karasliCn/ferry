@@ -80,4 +80,5 @@ settings:
     - rar
     - msg
     - em
+    - xlsm
     savefilepath: static/uploaddata/
