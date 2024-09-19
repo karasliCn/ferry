@@ -1,15 +1,18 @@
 package system
 
 import (
+	"errors"
 	"ferry/models/system"
 	"ferry/pkg/ldap"
 	"ferry/pkg/logger"
 	"ferry/tools"
 	"ferry/tools/app"
-
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/google/uuid"
+	"github.com/mssola/user_agent"
+	"regexp"
 )
 
 /*
@@ -24,6 +27,9 @@ import (
 // @Success 200 {string} string "{"code": -1, "message": "抱歉未找到相关信息"}"
 // @Router /api/v1/sysUserList [get]
 // @Security Bearer
+const MinMatchCount = 3
+const PwdMinLen = 8
+
 func GetSysUserList(c *gin.Context) {
 	var (
 		pageIndex = 1
@@ -223,6 +229,26 @@ func UpdateSysUser(c *gin.Context) {
 	}
 	data.UpdateBy = tools.GetUserIdStr(c)
 	result, err := data.Update(data.UserId)
+	if data.Password != "" {
+		var resetPwdLog system.LoginLog
+		ua := user_agent.New(c.Request.UserAgent())
+		resetPwdLog.Ipaddr = c.ClientIP()
+		location := tools.GetLocation(c.ClientIP())
+		resetPwdLog.LoginLocation = location
+		resetPwdLog.LoginTime = tools.GetCurrntTime()
+		resetPwdLog.Status = "0"
+		resetPwdLog.Remark = c.Request.UserAgent()
+		browserName, browserVersion := ua.Browser()
+		resetPwdLog.Browser = browserName + " " + browserVersion
+		resetPwdLog.Os = ua.OS()
+		resetPwdLog.Msg = "密码修改成功"
+		resetPwdLog.Platform = ua.Platform()
+		resetPwdLog.Username = result.Username
+		resetPwdLog, e2 := resetPwdLog.Create()
+		if e2 != nil {
+			fmt.Println(e2.Error())
+		}
+	}
 	if err != nil {
 		app.Error(c, -1, err, "")
 		return
@@ -291,6 +317,10 @@ func SysUserUpdatePwd(c *gin.Context) {
 		return
 	}
 	if pwd.PasswordType == 0 {
+		if !checkPasswordComplexity(pwd.NewPassword) {
+			app.Error(c, -1, errors.New("密码强度不够"), "密码强度不够，长度需大于8位，需包含大小写、数字、特殊符号四种中的三种")
+			return
+		}
 		sysuser := system.SysUser{}
 		sysuser.UserId = tools.GetUserId(c)
 		_, err = sysuser.SetPwd(pwd)
@@ -298,6 +328,7 @@ func SysUserUpdatePwd(c *gin.Context) {
 			app.Error(c, -1, err, "")
 			return
 		}
+
 	} else if pwd.PasswordType == 1 {
 		// 修改ldap密码
 		err = ldap.LdapUpdatePwd(tools.GetUserName(c), pwd.OldPassword, pwd.NewPassword)
@@ -306,6 +337,45 @@ func SysUserUpdatePwd(c *gin.Context) {
 			return
 		}
 	}
+	var loginLog system.LoginLog
+	ua := user_agent.New(c.Request.UserAgent())
+	loginLog.Ipaddr = c.ClientIP()
+	location := tools.GetLocation(c.ClientIP())
+	loginLog.LoginLocation = location
+	loginLog.LoginTime = tools.GetCurrntTime()
+	loginLog.Status = "0"
+	loginLog.Remark = c.Request.UserAgent()
+	browserName, browserVersion := ua.Browser()
+	loginLog.Browser = browserName + " " + browserVersion
+	loginLog.Os = ua.OS()
+	loginLog.Msg = "密码修改成功"
+	loginLog.Platform = ua.Platform()
+	loginLog.Username = tools.GetUserName(c)
+	_, _ = loginLog.Create()
 
 	app.OK(c, "", "密码修改成功")
+}
+
+func checkPasswordComplexity(password string) (isMatched bool) {
+	if len(password) < PwdMinLen {
+		return false
+	}
+	ruleArr := []string{"[A-Z]", "[a-z]", "[0-9]", "[!@#$%^&*()-+_=]"}
+
+	matchCount := 0
+	for _, rule := range ruleArr {
+		matchCount += testByRegex(password, rule)
+	}
+	return matchCount > MinMatchCount
+}
+
+func testByRegex(text string, regexText string) (isMatch int) {
+	pass, err := regexp.MatchString(regexText, text)
+	if err != nil {
+		return 0
+	}
+	if pass {
+		return 1
+	}
+	return 0
 }

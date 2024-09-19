@@ -30,6 +30,7 @@ func (u *Login) GetUser() (user SysUser, role SysRole, e error) {
 		if e != nil {
 			return
 		}
+		u.Password = ""
 	}
 
 	e = orm.Eloquent.Table("sys_role").Where("role_id = ? ", user.RoleId).First(&role).Error

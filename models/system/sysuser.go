@@ -6,6 +6,7 @@ import (
 	"ferry/pkg/logger"
 	"ferry/tools"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -45,20 +46,21 @@ type SysUserId struct {
 }
 
 type SysUserB struct {
-	NickName string `gorm:"type:varchar(128)" json:"nickName"` // 昵称
-	Phone    string `gorm:"type:varchar(11)" json:"phone"`     // 手机号
-	RoleId   int    `gorm:"type:int(11)" json:"roleId"`        // 角色编码
-	Salt     string `gorm:"type:varchar(255)" json:"salt"`     //盐
-	Avatar   string `gorm:"type:varchar(255)" json:"avatar"`   //头像
-	Sex      string `gorm:"type:varchar(255)" json:"sex"`      //性别
-	Email    string `gorm:"type:varchar(128)" json:"email"`    //邮箱
-	DeptId   int    `gorm:"type:int(11)" json:"deptId"`        //部门编码
-	PostId   int    `gorm:"type:int(11)" json:"postId"`        //职位编码
-	CreateBy string `gorm:"type:varchar(128)" json:"createBy"` //
-	UpdateBy string `gorm:"type:varchar(128)" json:"updateBy"` //
-	Remark   string `gorm:"type:varchar(255)" json:"remark"`   //备注
-	Status   string `gorm:"type:int(1);" json:"status"`
-	Params   string `gorm:"-" json:"params"`
+	NickName       string     `gorm:"type:varchar(128)" json:"nickName"` // 昵称
+	Phone          string     `gorm:"type:varchar(11)" json:"phone"`     // 手机号
+	RoleId         int        `gorm:"type:int(11)" json:"roleId"`        // 角色编码
+	Salt           string     `gorm:"type:varchar(255)" json:"salt"`     //盐
+	Avatar         string     `gorm:"type:varchar(255)" json:"avatar"`   //头像
+	Sex            string     `gorm:"type:varchar(255)" json:"sex"`      //性别
+	Email          string     `gorm:"type:varchar(128)" json:"email"`    //邮箱
+	DeptId         int        `gorm:"type:int(11)" json:"deptId"`        //部门编码
+	PostId         int        `gorm:"type:int(11)" json:"postId"`        //职位编码
+	CreateBy       string     `gorm:"type:varchar(128)" json:"createBy"` //
+	UpdateBy       string     `gorm:"type:varchar(128)" json:"updateBy"` //
+	Remark         string     `gorm:"type:varchar(255)" json:"remark"`   //备注
+	Status         string     `gorm:"type:int(1);" json:"status"`
+	Params         string     `gorm:"-" json:"params"`
+	PwdLastModDate *time.Time `gorm:"column:pwd_last_modify_time" gorm:"type:timestamp"  json:"PwdLastModDate"`
 	BaseModel
 }
 
@@ -125,7 +127,7 @@ func (e *SysUser) Get() (SysUserView SysUserView, err error) {
 		return
 	}
 
-	SysUserView.Password = ""
+	SysUserView.Password = "********"
 	return
 }
 
@@ -229,10 +231,18 @@ func (e *SysUser) GetPage(pageSize int, pageIndex int) ([]SysUserPage, int, erro
 		return nil, 0, err
 	}
 	table.Where("sys_user.delete_time IS NULL").Count(&count)
+
+	// return result should remove password
+	if count > 0 {
+		for idx := range doc {
+			doc[idx].Salt = "********"
+			doc[idx].Password = "********"
+		}
+	}
 	return doc, count, nil
 }
 
-//加密
+// 加密
 func (e *SysUser) Encrypt() (err error) {
 	if e.Password == "" {
 		return
@@ -247,7 +257,7 @@ func (e *SysUser) Encrypt() (err error) {
 	}
 }
 
-//添加
+// 添加
 func (e SysUser) Insert() (id int, err error) {
 	if err = e.Encrypt(); err != nil {
 		return
@@ -269,7 +279,7 @@ func (e SysUser) Insert() (id int, err error) {
 	return
 }
 
-//修改
+// 修改
 func (e *SysUser) Update(id int) (update SysUser, err error) {
 	if e.Password != "" {
 		if err = e.Encrypt(); err != nil {
@@ -313,6 +323,8 @@ func (e *SysUser) SetPwd(pwd SysUserPwd) (Result bool, err error) {
 		return
 	}
 	e.Password = pwd.NewPassword
+	now := time.Now()
+	e.PwdLastModDate = &now
 	_, err = e.Update(e.UserId)
 	tools.HasError(err, "更新密码失败(代码202)", 500)
 	return

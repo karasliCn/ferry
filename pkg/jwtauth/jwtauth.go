@@ -62,7 +62,7 @@ type GinJWTMiddleware struct {
 	Unauthorized func(*gin.Context, int, string)
 
 	// User can define own LoginResponse func.
-	LoginResponse func(*gin.Context, int, string, time.Time)
+	LoginResponse func(*gin.Context, int, string, time.Time, bool)
 
 	// User can define own RefreshResponse func.
 	RefreshResponse func(*gin.Context, int, string, time.Time)
@@ -316,11 +316,12 @@ func (mw *GinJWTMiddleware) MiddlewareInit() error {
 	}
 
 	if mw.LoginResponse == nil {
-		mw.LoginResponse = func(c *gin.Context, code int, token string, expire time.Time) {
+		mw.LoginResponse = func(c *gin.Context, code int, token string, expire time.Time, needModPwd bool) {
 			c.JSON(http.StatusOK, gin.H{
-				"code":   http.StatusOK,
-				"token":  token,
-				"expire": expire.Format(time.RFC3339),
+				"code":       http.StatusOK,
+				"token":      token,
+				"expire":     expire.Format(time.RFC3339),
+				"needModPwd": needModPwd,
 			})
 		}
 	}
@@ -459,6 +460,8 @@ func (mw *GinJWTMiddleware) LoginHandler(c *gin.Context) {
 	token := jwt.New(jwt.GetSigningMethod(mw.SigningAlgorithm))
 	claims := token.Claims.(jwt.MapClaims)
 
+	needModPwd := data.(map[string]interface{})["needModPwd"].(bool)
+
 	if mw.PayloadFunc != nil {
 		for key, value := range mw.PayloadFunc(data) {
 			claims[key] = value
@@ -489,7 +492,7 @@ func (mw *GinJWTMiddleware) LoginHandler(c *gin.Context) {
 		)
 	}
 
-	mw.LoginResponse(c, http.StatusOK, tokenString, expire)
+	mw.LoginResponse(c, http.StatusOK, tokenString, expire, needModPwd)
 }
 
 func (mw *GinJWTMiddleware) signedString(token *jwt.Token) (string, error) {

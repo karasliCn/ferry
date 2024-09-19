@@ -149,23 +149,49 @@ func Authenticator(c *gin.Context) (interface{}, error) {
 		}
 	}
 
+	var loginLogs []system.LoginLog
+	e := orm.Eloquent.Model(system.LoginLog{}).Debug().Where("username = ?", loginVal.Username).Order("login_time desc").Limit(5).Find(&loginLogs).Error
+	if e != nil {
+		return nil, jwt.ErrFailedAuthentication
+	}
+	isKeepFailed := true
+	for _, log := range loginLogs {
+		if log.Status == "0" {
+			isKeepFailed = false
+		}
+	}
+
+	if isKeepFailed && time.Now().Before(loginLogs[0].LoginTime.Add(5*time.Minute)) {
+		return nil, errors.New("连续登录5次失败，账号锁定到" + loginLogs[0].LoginTime.Add(5*time.Minute).String())
+	}
+
 	user, role, e := loginVal.GetUser()
+	if e != nil {
+		loginLog.Status = "1"
+		loginLog.Msg = "登录失败"
+		_, _ = loginLog.Create()
+		logger.Info(e.Error())
+		return nil, jwt.ErrFailedAuthentication
+	}
+
 	if e == nil {
 		_, _ = loginLog.Create()
 
 		if user.Status == "1" {
 			return nil, errors.New("用户已被禁用。")
 		}
+		needModPwd := false
+		if user.PwdLastModDate == nil {
+			needModPwd = true
+		} else {
+			needModPwd = time.Since(*user.PwdLastModDate) > time.Hour*24*180
+		}
 
-		return map[string]interface{}{"user": user, "role": role}, nil
-	} else {
-		loginLog.Status = "1"
-		loginLog.Msg = "登录失败"
-		_, _ = loginLog.Create()
-		logger.Info(e.Error())
+		return map[string]interface{}{"user": user, "role": role, "needModPwd": needModPwd}, nil
 	}
 
 	return nil, jwt.ErrFailedAuthentication
+
 }
 
 // @Summary 退出登录
