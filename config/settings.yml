@@ -82,3 +82,10 @@ settings:
       - msg
       - em
       - xlsm
+  password:
+    max_login_failed: 1
+    lock_duration: 10
+    password_min_len: 8
+    policy_level: 3
+    password_change_duration: 180
+

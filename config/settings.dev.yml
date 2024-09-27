@@ -53,6 +53,12 @@ settings:
     maxbackups: 300
     maxsize: 10240
     path: ./logs/ferry.log
+  password:
+    lock_duration: 10
+    max_login_failed: 1
+    password_change_duration: 180
+    password_min_len: 8
+    policy_level: 3
   public:
     islocation: 0
   redis:

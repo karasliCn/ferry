@@ -10,7 +10,9 @@ import (
 	"ferry/pkg/settings"
 	"ferry/tools"
 	"fmt"
+	"github.com/spf13/viper"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-ldap/ldap/v3"
@@ -149,8 +151,13 @@ func Authenticator(c *gin.Context) (interface{}, error) {
 		}
 	}
 
+	var maxFailedLogin = viper.GetInt("settings.password.max_login_failed")
+	var lockDuration = viper.GetInt("settings.password.lock_duration")
+	var pwdChgDuration = viper.GetInt("settings.password.lock_duration")
+	var lockDurationMin = time.Minute * time.Duration(lockDuration)
+
 	var loginLogs []system.LoginLog
-	e := orm.Eloquent.Model(system.LoginLog{}).Debug().Where("username = ?", loginVal.Username).Order("login_time desc").Limit(5).Find(&loginLogs).Error
+	e := orm.Eloquent.Model(system.LoginLog{}).Debug().Where("username = ?", loginVal.Username).Order("login_time desc").Limit(maxFailedLogin).Find(&loginLogs).Error
 	if e != nil {
 		return nil, jwt.ErrFailedAuthentication
 	}
@@ -162,7 +169,7 @@ func Authenticator(c *gin.Context) (interface{}, error) {
 	}
 
 	if isKeepFailed && time.Now().Before(loginLogs[0].LoginTime.Add(5*time.Minute)) {
-		return nil, errors.New("连续登录5次失败，账号锁定到" + loginLogs[0].LoginTime.Add(5*time.Minute).String())
+		return nil, errors.New("连续登录" + strconv.Itoa(maxFailedLogin) + "次失败，账号锁定到" + loginLogs[0].LoginTime.Add(lockDurationMin).String())
 	}
 
 	user, role, e := loginVal.GetUser()
@@ -184,7 +191,7 @@ func Authenticator(c *gin.Context) (interface{}, error) {
 		if user.PwdLastModDate == nil {
 			needModPwd = true
 		} else {
-			needModPwd = time.Since(*user.PwdLastModDate) > time.Hour*24*180
+			needModPwd = time.Since(*user.PwdLastModDate) > time.Hour*24*time.Duration(pwdChgDuration)
 		}
 
 		return map[string]interface{}{"user": user, "role": role, "needModPwd": needModPwd}, nil

@@ -3,6 +3,7 @@ package system
 import (
 	"errors"
 	"ferry/models/system"
+	"ferry/pkg/constants"
 	"ferry/pkg/ldap"
 	"ferry/pkg/logger"
 	"ferry/tools"
@@ -12,7 +13,10 @@ import (
 	"github.com/gin-gonic/gin/binding"
 	"github.com/google/uuid"
 	"github.com/mssola/user_agent"
+	"github.com/spf13/viper"
 	"regexp"
+	"strconv"
+	"time"
 )
 
 /*
@@ -27,8 +31,6 @@ import (
 // @Success 200 {string} string "{"code": -1, "message": "抱歉未找到相关信息"}"
 // @Router /api/v1/sysUserList [get]
 // @Security Bearer
-const MinMatchCount = 3
-const PwdMinLen = 8
 
 func GetSysUserList(c *gin.Context) {
 	var (
@@ -227,6 +229,13 @@ func UpdateSysUser(c *gin.Context) {
 		app.Error(c, -1, err, "")
 		return
 	}
+	if data.Password != "" {
+
+		oldTime, _ := time.Parse(constants.TimeFormat, constants.TimeFormat)
+		if err == nil {
+			data.PwdLastModDate = &oldTime
+		}
+	}
 	data.UpdateBy = tools.GetUserIdStr(c)
 	result, err := data.Update(data.UserId)
 	if data.Password != "" {
@@ -310,6 +319,7 @@ func InsetSysUserAvatar(c *gin.Context) {
 }
 
 func SysUserUpdatePwd(c *gin.Context) {
+	MinMatchCount := viper.GetInt("settings.password.policy_level")
 	var pwd system.SysUserPwd
 	err := c.Bind(&pwd)
 	if err != nil {
@@ -318,7 +328,8 @@ func SysUserUpdatePwd(c *gin.Context) {
 	}
 	if pwd.PasswordType == 0 {
 		if !checkPasswordComplexity(pwd.NewPassword) {
-			app.Error(c, -1, errors.New("密码强度不够"), "密码强度不够，长度需大于8位，需包含大小写、数字、特殊符号四种中的三种")
+			app.Error(c, -1, errors.New("密码强度不够"),
+				"密码强度不够，长度需大于8位，需包含大小写、数字、特殊符号4种中的"+strconv.Itoa(MinMatchCount)+"种")
 			return
 		}
 		sysuser := system.SysUser{}
@@ -357,6 +368,8 @@ func SysUserUpdatePwd(c *gin.Context) {
 }
 
 func checkPasswordComplexity(password string) (isMatched bool) {
+	MinMatchCount := viper.GetInt("settings.password.policy_level")
+	PwdMinLen := viper.GetInt("settings.password.password_min_len")
 	if len(password) < PwdMinLen {
 		return false
 	}
