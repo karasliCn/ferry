@@ -10,12 +10,11 @@ import (
 	"ferry/pkg/settings"
 	"ferry/tools"
 	"fmt"
+	"github.com/go-ldap/ldap/v3"
 	"github.com/spf13/viper"
 	"net/http"
 	"strconv"
 	"time"
-
-	"github.com/go-ldap/ldap/v3"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mojocn/base64Captcha"

@@ -2,6 +2,7 @@ package system
 
 import (
 	"errors"
+	"ferry/global/orm"
 	"ferry/models/system"
 	"ferry/pkg/constants"
 	"ferry/pkg/ldap"
@@ -204,6 +205,13 @@ func InsertSysUser(c *gin.Context) {
 		return
 	}
 
+	if !checkPasswordComplexity(sysuser.Password) {
+		MinMatchCount := viper.GetInt("settings.password.policy_level")
+		app.Error(c, -1, errors.New("密码强度不够"),
+			"密码强度不够，长度需大于8位，需包含大小写、数字、特殊符号4种中的"+strconv.Itoa(MinMatchCount)+"种")
+		return
+	}
+
 	sysuser.CreateBy = tools.GetUserIdStr(c)
 	id, err := sysuser.Insert()
 	if err != nil {
@@ -230,7 +238,12 @@ func UpdateSysUser(c *gin.Context) {
 		return
 	}
 	if data.Password != "" {
-
+		if !checkPasswordComplexity(data.Password) {
+			MinMatchCount := viper.GetInt("settings.password.policy_level")
+			app.Error(c, -1, errors.New("密码强度不够"),
+				"密码强度不够，长度需大于8位，需包含大小写、数字、特殊符号4种中的"+strconv.Itoa(MinMatchCount)+"种")
+			return
+		}
 		oldTime, _ := time.Parse(constants.TimeFormat, constants.TimeFormat)
 		if err == nil {
 			data.PwdLastModDate = &oldTime
@@ -319,15 +332,31 @@ func InsetSysUserAvatar(c *gin.Context) {
 }
 
 func SysUserUpdatePwd(c *gin.Context) {
-	MinMatchCount := viper.GetInt("settings.password.policy_level")
 	var pwd system.SysUserPwd
 	err := c.Bind(&pwd)
 	if err != nil {
 		app.Error(c, -1, err, "")
 		return
 	}
+	sysuser := system.SysUser{}
+	userId := tools.GetUserId(c)
+	err = orm.Eloquent.Model(&system.SysUser{}).
+		Where("user_id = ?", userId).Find(&sysuser).Error
+	if err != nil {
+		app.Error(c, -1, errors.New("用户不存在"), "用户不存在")
+		return
+	}
+	_, err = tools.CompareHashAndPassword(sysuser.Password, pwd.OldPassword)
+	if err != nil {
+		app.Error(c, -1, errors.New("旧密码错误"), "旧密码错误,请输入正确旧密码")
+		return
+	}
+	if err != nil {
+		return
+	}
 	if pwd.PasswordType == 0 {
 		if !checkPasswordComplexity(pwd.NewPassword) {
+			MinMatchCount := viper.GetInt("settings.password.policy_level")
 			app.Error(c, -1, errors.New("密码强度不够"),
 				"密码强度不够，长度需大于8位，需包含大小写、数字、特殊符号4种中的"+strconv.Itoa(MinMatchCount)+"种")
 			return
@@ -379,7 +408,7 @@ func checkPasswordComplexity(password string) (isMatched bool) {
 	for _, rule := range ruleArr {
 		matchCount += testByRegex(password, rule)
 	}
-	return matchCount > MinMatchCount
+	return matchCount >= MinMatchCount
 }
 
 func testByRegex(text string, regexText string) (isMatch int) {

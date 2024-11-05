@@ -322,6 +322,7 @@ func (e *SysUser) SetPwd(pwd SysUserPwd) (Result bool, err error) {
 		logger.Info(err)
 		return
 	}
+
 	e.Password = pwd.NewPassword
 	now := time.Now()
 	e.PwdLastModDate = &now
